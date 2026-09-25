@@ -53,6 +53,6 @@ if [ ! -f "$KEYSTORE" ]; then
     -validity 10000 -storepass "$KEY_PASS" -keypass "$KEY_PASS" -dname "CN=Proto-Timer"
 fi
 apksigner sign --ks "$KEYSTORE" --ks-key-alias "$KEY_ALIAS" --ks-pass "pass:$KEY_PASS" \
-  --key-pass "pass:$KEY_PASS" --min-sdk-version 24 --out dist/ProtoTimer.apk build/aligned.apk
+  --key-pass "pass:$KEY_PASS" --min-sdk-version 24 --v4-signing-enabled false --out dist/ProtoTimer.apk build/aligned.apk
 apksigner verify --min-sdk-version 24 --print-certs dist/ProtoTimer.apk | head -2
 ls -l dist/ProtoTimer.apk
