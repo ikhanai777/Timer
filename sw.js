@@ -1,6 +1,6 @@
 // Cache-first service worker so the timer works offline once installed.
-const CACHE = 'proto-timer-v1';
-const ASSETS = ['./', 'index.html', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'proto-timer-v2';
+const ASSETS = ['./', 'index.html', 'v1.html', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

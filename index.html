@@ -11,17 +11,30 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&family=Share+Tech+Mono&display=swap">
 <style>
+  /* Proto-Timer v2 — one dark instrument-panel look; the accent colour is switchable. */
   :root {
-    --green: #7dffa0;
-    --green-mid: #3fdc6a;
-    --green-dim: rgba(125, 255, 160, 0.07);
-    --glow: rgba(60, 255, 110, 0.55);
-    --glow-soft: rgba(60, 255, 110, 0.18);
-    --text: #8dfbab;
-    --panel: #000;
+    color-scheme: dark;
+    --c-rgb: 125 255 160;        /* accent (theme) */
+    --warn-rgb: 255 196 84;      /* last 15% */
+    --crit-rgb: 255 92 108;      /* final seconds */
+    --rest-rgb: 140 170 255;     /* rest between rounds */
+    --bar-rgb: var(--c-rgb);
     --bg: #000;
+    --panel: #020403;
+    --btn-top: #454947;
+    --btn-bot: #191a19;
+    --ui: "Chakra Petch", "Rajdhani", "Segoe UI", Roboto, sans-serif;
+    --mono: "Share Tech Mono", "Roboto Mono", ui-monospace, monospace;
   }
+  :root[data-accent="amber"]  { --c-rgb: 255 190 92; --warn-rgb: 255 140 60; }
+  :root[data-accent="cyan"]   { --c-rgb: 110 238 255; }
+  :root[data-accent="red"]    { --c-rgb: 255 104 118; --crit-rgb: 255 240 240; }
+  :root[data-accent="violet"] { --c-rgb: 196 160 255; }
+  :root[data-accent="white"]  { --c-rgb: 225 240 232; }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -29,16 +42,18 @@
     margin: 0;
     height: 100%;
     background: var(--bg);
-    color: var(--text);
-    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: rgb(var(--c-rgb));
+    font-family: var(--ui);
     overflow: hidden;
     overscroll-behavior: none;
     user-select: none;
     -webkit-user-select: none;
     touch-action: manipulation;
   }
+  button { font-family: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid rgb(var(--c-rgb)); outline-offset: 3px; }
 
-  /* Whole app is sized to the viewport; on the S25 Ultra that is ~412x915 CSS px. */
+  /* Sized to the viewport; on the S25 Ultra that is ~412x915 CSS px. */
   .app {
     height: 100vh;
     height: 100dvh;
@@ -46,12 +61,14 @@
     flex-direction: column;
     align-items: center;
     padding:
-      calc(env(safe-area-inset-top, 0px) + 3.5vh)
-      calc(env(safe-area-inset-right, 0px) + 6vw)
-      calc(env(safe-area-inset-bottom, 0px) + 3vh)
-      calc(env(safe-area-inset-left, 0px) + 6vw);
-    gap: 3.2vh;
-    background: radial-gradient(ellipse at 50% 45%, rgba(40, 255, 100, 0.10), transparent 70%), var(--bg);
+      calc(env(safe-area-inset-top, 0px) + 3vh)
+      calc(env(safe-area-inset-right, 0px) + max(16px, 5.5vw))
+      calc(env(safe-area-inset-bottom, 0px) + 2.6vh)
+      calc(env(safe-area-inset-left, 0px) + max(16px, 5.5vw));
+    gap: 2.8vh;
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 42%, rgb(var(--c-rgb) / 0.10), transparent 70%),
+      var(--bg);
   }
 
   /* ---------- Main panel ---------- */
@@ -61,33 +78,51 @@
     min-height: 0;
     width: 100%;
     max-width: 480px;
-    background: var(--panel);
     border-radius: 44px;
+    background:
+      linear-gradient(180deg, rgb(var(--c-rgb) / 0.035), transparent 30%),
+      var(--panel);
     box-shadow:
-      0 0 0 1px rgba(125, 255, 160, 0.06),
-      0 0 40px 6px var(--glow-soft),
-      0 0 110px 20px rgba(60, 255, 110, 0.10);
+      0 0 0 1px rgb(var(--c-rgb) / 0.10),
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      0 0 38px 4px rgb(var(--c-rgb) / 0.16),
+      0 0 120px 24px rgb(var(--c-rgb) / 0.08);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 3.4vh 7% 2.6vh;
+    padding: 2.8vh 7% 2.2vh;
+    overflow: hidden;
+  }
+  .panel::after {
+    /* faint scanlines, like an old phosphor screen */
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: repeating-linear-gradient(0deg, rgb(255 255 255 / 0.022) 0 1px, transparent 1px 3px);
+    pointer-events: none;
   }
 
+  .head {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: clamp(10px, 1.45vh, 13px);
+    letter-spacing: 0.14em;
+    color: rgb(var(--c-rgb) / 0.6);
+  }
+  .head .l { justify-self: start; }
+  .head .r { justify-self: end; }
   .label {
-    font-size: clamp(22px, 3.6vh, 34px);
-    letter-spacing: 0.02em;
-    color: var(--text);
-    text-shadow: 0 0 10px var(--glow);
+    font-size: clamp(22px, 3.4vh, 32px);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 10px rgb(var(--c-rgb) / 0.6);
     line-height: 1;
   }
-
-  .brand {
-    font-size: clamp(16px, 2.6vh, 24px);
-    color: var(--text);
-    text-shadow: 0 0 8px var(--glow);
-    margin-top: 2.4vh;
-    letter-spacing: 0.02em;
-  }
+  .label.rest { color: rgb(var(--rest-rgb)); text-shadow: 0 0 10px rgb(var(--rest-rgb) / 0.6); }
 
   /* ---------- 7‑segment display ---------- */
   .display {
@@ -97,67 +132,154 @@
     width: 100%;
     margin-top: 1.6vh;
     gap: 1.2%;
-    filter: drop-shadow(0 0 6px var(--glow));
+    filter: drop-shadow(0 0 6px rgb(var(--c-rgb) / 0.55));
+    cursor: pointer;
+    transition: filter 0.3s;
   }
-  .digit { height: clamp(52px, 8.6vh, 88px); width: auto; flex: 0 1 auto; }
-  .digit polygon { fill: var(--green-dim); transition: fill 0.08s; }
-  .digit polygon.on { fill: var(--green); }
-  .colon { height: clamp(52px, 8.6vh, 88px); width: auto; flex: 0 0 auto; }
-  .colon circle { fill: var(--green); }
-  .display.blink { animation: blink 1s steps(1) infinite; }
+  .digit, .colon { height: clamp(50px, 8.2vh, 86px); width: auto; flex: 0 1 auto; }
+  .colon { flex: 0 0 auto; }
+  .digit polygon { fill: rgb(var(--c-rgb) / 0.07); transition: fill 0.08s; }
+  .digit polygon.on { fill: rgb(var(--c-rgb)); }
+  .colon circle { fill: rgb(var(--c-rgb)); transition: opacity 0.2s; }
+  .display.paused .colon circle { animation: blink 1s steps(1) infinite; }
+  .display.blink { animation: blink 0.9s steps(1) infinite; }
+  .display.crit .digit polygon.on, .display.crit .colon circle { fill: rgb(var(--crit-rgb)); }
+  .display.crit { filter: drop-shadow(0 0 7px rgb(var(--crit-rgb) / 0.6)); }
+  .display.rest .digit polygon.on, .display.rest .colon circle { fill: rgb(var(--rest-rgb)); }
+  .display.rest { filter: drop-shadow(0 0 7px rgb(var(--rest-rgb) / 0.55)); }
   @keyframes blink { 50% { opacity: 0.15; } }
 
-  /* ---------- Charging bar ---------- */
+  .status {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.3vh;
+    font-family: var(--mono);
+    font-size: clamp(12px, 1.75vh, 15px);
+    letter-spacing: 0.08em;
+    color: rgb(var(--c-rgb) / 0.75);
+    font-variant-numeric: tabular-nums;
+    padding: 0 3%;
+  }
+
+  .nudges {
+    display: flex;
+    gap: 10px;
+    margin-top: 1.5vh;
+  }
+  .nudge {
+    height: 30px;
+    min-width: 58px;
+    padding: 0 12px;
+    border-radius: 15px;
+    border: 1px solid rgb(var(--c-rgb) / 0.35);
+    background: rgb(var(--c-rgb) / 0.05);
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .nudge:active { background: rgb(var(--c-rgb) / 0.2); border-color: rgb(var(--c-rgb)); }
+  .nudges.hide { visibility: hidden; }
+
+  /* ---------- Charging meter ---------- */
   .meter-wrap {
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
     display: flex;
     justify-content: center;
-    margin-top: 4.5vh;
+    gap: 10px;
+    margin-top: 2.4vh;
+    padding-left: 30px; /* balances the scale on the right */
   }
   .meter {
+    --bar-rgb: var(--c-rgb);
     height: 100%;
     width: clamp(96px, 30%, 150px);
-    border: 3px solid var(--green);
+    border: 3px solid rgb(var(--bar-rgb));
     border-radius: 16px;
     padding: 10px 12px;
     display: flex;
     flex-direction: column-reverse; /* bar 0 at the bottom */
     gap: 1.2%;
-    box-shadow: 0 0 14px var(--glow), inset 0 0 12px rgba(60, 255, 110, 0.25);
     position: relative;
+    box-shadow: 0 0 14px rgb(var(--bar-rgb) / 0.55), inset 0 0 14px rgb(var(--bar-rgb) / 0.22);
+    transition: border-color 0.4s, box-shadow 0.4s;
   }
   .meter::before {
-    /* soft green halo behind the lit bars */
+    /* battery terminal */
     content: "";
     position: absolute;
-    inset: 0;
-    border-radius: 14px;
-    background: radial-gradient(ellipse at 50% 60%, rgba(60, 255, 110, 0.18), transparent 70%);
-    pointer-events: none;
+    top: -11px;
+    left: 50%;
+    width: 34%;
+    height: 8px;
+    transform: translateX(-50%);
+    border: 3px solid rgb(var(--bar-rgb));
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: 0 0 10px rgb(var(--bar-rgb) / 0.45);
   }
+  .meter.warn { --bar-rgb: var(--warn-rgb); }
+  .meter.crit { --bar-rgb: var(--crit-rgb); }
+  .meter.rest { --bar-rgb: var(--rest-rgb); }
   .bar {
     flex: 1 1 0;
     min-height: 3px;
     border-radius: 5px;
-    background: rgba(125, 255, 160, 0.08);
-    box-shadow: inset 0 0 0 1px rgba(125, 255, 160, 0.04);
-    transition: background 0.25s, box-shadow 0.25s;
+    background: rgb(var(--bar-rgb) / 0.08);
+    transition: background 0.3s, box-shadow 0.3s;
   }
   .bar.on {
-    background: linear-gradient(180deg, #b6ffc8, var(--green) 45%, #5cf585);
-    box-shadow: 0 0 8px var(--glow), 0 0 18px rgba(60, 255, 110, 0.35);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.45), transparent 55%),
+      rgb(var(--bar-rgb));
+    box-shadow: 0 0 8px rgb(var(--bar-rgb) / 0.6), 0 0 18px rgb(var(--bar-rgb) / 0.3);
   }
   .bar.charging { animation: charge 1.1s ease-in-out infinite; }
   @keyframes charge {
-    0%, 100% { background: rgba(125, 255, 160, 0.10); box-shadow: none; }
-    50% { background: rgba(125, 255, 160, 0.55); box-shadow: 0 0 10px var(--glow); }
+    0%, 100% { background: rgb(var(--bar-rgb) / 0.10); box-shadow: none; }
+    50% { background: rgb(var(--bar-rgb) / 0.6); box-shadow: 0 0 10px rgb(var(--bar-rgb) / 0.55); }
   }
   .meter.done .bar { animation: flash 0.6s steps(1) infinite; }
-  @keyframes flash { 50% { background: rgba(125, 255, 160, 0.08); box-shadow: none; } }
+  .meter.done .bar:nth-child(even) { animation-delay: 0.3s; }
+  @keyframes flash { 50% { background: rgb(var(--bar-rgb) / 0.08); box-shadow: none; } }
 
-  /* ---------- Buttons ---------- */
+  .scale {
+    width: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: rgb(var(--c-rgb) / 0.4);
+    font-variant-numeric: tabular-nums;
+  }
+  .scale span { position: relative; line-height: 1; transform: translateY(-50%); }
+  .scale span:first-child { transform: none; }
+  .scale span:last-child { transform: translateY(0); }
+  .scale span::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    width: 5px;
+    border-top: 1px solid rgb(var(--c-rgb) / 0.4);
+  }
+
+  .brand {
+    margin-top: 2vh;
+    font-size: clamp(15px, 2.3vh, 21px);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 8px rgb(var(--c-rgb) / 0.5);
+  }
+  .brand small { font-family: var(--mono); font-size: 0.6em; opacity: 0.55; margin-left: 4px; }
+
+  /* ---------- Hardware buttons ---------- */
   .controls {
     flex: 0 0 auto;
     width: 100%;
@@ -168,36 +290,77 @@
     padding: 0 1%;
   }
   .btn {
+    position: relative;
     aspect-ratio: 1 / 1;
     width: 100%;
+    max-width: 100%;
     border-radius: 18px;
-    border: 3px solid var(--green);
-    background:
-      radial-gradient(circle at 50% 35%, #4a4d4b, #2b2d2c 60%, #1c1d1c);
+    border: 3px solid rgb(var(--c-rgb) / 0.85);
+    background: radial-gradient(circle at 50% 30%, var(--btn-top), #2b2d2c 58%, var(--btn-bot));
     box-shadow:
-      0 0 12px var(--glow),
-      0 0 26px rgba(60, 255, 110, 0.25),
-      inset 0 0 0 5px #111,
-      inset 0 2px 6px rgba(255, 255, 255, 0.12);
-    color: var(--text);
-    font: inherit;
-    font-size: clamp(13px, 2.1vh, 19px);
+      0 0 12px rgb(var(--c-rgb) / 0.45),
+      0 0 26px rgb(var(--c-rgb) / 0.18),
+      inset 0 0 0 5px #0d0e0d,
+      inset 0 2px 6px rgb(255 255 255 / 0.14),
+      0 5px 0 #050605;
+    font-size: clamp(12px, 1.95vh, 17px);
+    font-weight: 500;
+    letter-spacing: 0.04em;
     line-height: 1.05;
-    text-shadow: 0 0 6px var(--glow);
+    text-shadow: 0 0 6px rgb(var(--c-rgb) / 0.6);
     padding: 0;
     cursor: pointer;
-    transition: transform 0.08s, filter 0.15s, box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: transform 0.07s, box-shadow 0.07s, filter 0.15s;
   }
-  .btn.small { font-size: clamp(10px, 1.5vh, 14px); }
-  .btn:active { transform: scale(0.94); filter: brightness(1.25); }
-  .btn:disabled { opacity: 0.4; filter: grayscale(0.4); }
-  .btn.active { box-shadow: 0 0 18px var(--glow), 0 0 40px rgba(60, 255, 110, 0.45), inset 0 0 0 5px #111, inset 0 0 14px rgba(125, 255, 160, 0.35); }
+  .btn svg { width: 34%; height: auto; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px rgb(var(--c-rgb) / 0.6)); }
+  .btn .led {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgb(var(--c-rgb) / 0.15);
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn.lit .led { background: rgb(var(--c-rgb)); box-shadow: 0 0 6px rgb(var(--c-rgb)), 0 0 12px rgb(var(--c-rgb) / 0.7); }
+  .btn.lit { border-color: rgb(var(--c-rgb)); box-shadow: 0 0 18px rgb(var(--c-rgb) / 0.6), 0 0 40px rgb(var(--c-rgb) / 0.3), inset 0 0 0 5px #0d0e0d, inset 0 0 14px rgb(var(--c-rgb) / 0.3), 0 5px 0 #050605; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 0 10px rgb(var(--c-rgb) / 0.5), inset 0 0 0 5px #0d0e0d, inset 0 2px 8px rgb(0 0 0 / 0.6), 0 1px 0 #050605; filter: brightness(1.2); }
+  .btn:disabled { opacity: 0.35; filter: grayscale(0.5); }
+  .btn .t2 { font-size: 0.74em; letter-spacing: 0; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    top: calc(env(safe-area-inset-top, 0px) + 18px);
+    transform: translate(-50%, -12px);
+    padding: 9px 16px;
+    border-radius: 20px;
+    background: #061009;
+    border: 1px solid rgb(var(--c-rgb) / 0.5);
+    box-shadow: 0 0 18px rgb(var(--c-rgb) / 0.25);
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 20;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   /* ---------- Settings sheet ---------- */
   .sheet-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.78);
+    background: rgb(0 0 0 / 0.8);
     display: none;
     align-items: flex-end;
     justify-content: center;
@@ -207,185 +370,426 @@
   .sheet {
     width: 100%;
     max-width: 520px;
-    max-height: 92dvh;
-    overflow-y: auto;
-    background: #050805;
-    border: 2px solid var(--green);
+    height: min(88dvh, 760px);
+    display: flex;
+    flex-direction: column;
+    background: #030604;
+    border: 2px solid rgb(var(--c-rgb) / 0.8);
     border-bottom: none;
     border-radius: 28px 28px 0 0;
-    box-shadow: 0 0 30px var(--glow-soft);
-    padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px);
+    box-shadow: 0 0 30px rgb(var(--c-rgb) / 0.18);
     animation: up 0.22s ease-out;
+    color: rgb(var(--c-rgb));
   }
   @keyframes up { from { transform: translateY(40px); opacity: 0; } }
+  .sheet-top { padding: 18px 20px 0; }
   .sheet h2 {
-    margin: 0 0 16px;
+    margin: 0 0 14px;
     font-weight: 500;
-    font-size: 22px;
+    font-size: 21px;
+    letter-spacing: 0.08em;
     text-align: center;
-    text-shadow: 0 0 8px var(--glow);
-  }
-  .section-title {
-    font-size: 13px;
-    letter-spacing: 0.12em;
     text-transform: uppercase;
-    opacity: 0.7;
+    text-shadow: 0 0 8px rgb(var(--c-rgb) / 0.5);
+  }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; border-bottom: 1px solid rgb(var(--c-rgb) / 0.15); }
+  .tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 0 11px;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    cursor: pointer;
+    margin-bottom: -1px;
+  }
+  .tab.sel { opacity: 1; border-bottom-color: rgb(var(--c-rgb)); text-shadow: 0 0 8px rgb(var(--c-rgb) / 0.6); }
+  .sheet-body { flex: 1 1 auto; overflow-y: auto; padding: 4px 20px 16px; }
+  .pane { display: none; }
+  .pane.sel { display: block; }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    opacity: 0.6;
     margin: 18px 0 10px;
   }
 
   .time-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .time-picker.two { grid-template-columns: repeat(2, 1fr); }
   .unit { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .unit span { font-size: 12px; letter-spacing: 0.1em; opacity: 0.7; }
+  .unit span { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; opacity: 0.6; }
   .step {
     width: 100%;
-    height: 44px;
+    height: 40px;
     border-radius: 12px;
-    border: 1px solid rgba(125, 255, 160, 0.4);
-    background: #0c140e;
-    color: var(--green);
-    font-size: 22px;
+    border: 1px solid rgb(var(--c-rgb) / 0.35);
+    background: rgb(var(--c-rgb) / 0.05);
+    font-size: 18px;
     cursor: pointer;
   }
-  .step:active { background: #16301c; }
+  .step:active { background: rgb(var(--c-rgb) / 0.2); }
   .unit input {
     width: 100%;
-    height: 64px;
+    height: 60px;
     text-align: center;
-    font-size: 36px;
+    font-size: 34px;
+    font-family: var(--mono);
     font-variant-numeric: tabular-nums;
-    font-family: inherit;
-    color: var(--green);
+    color: rgb(var(--c-rgb));
     background: #000;
-    border: 2px solid var(--green);
+    border: 2px solid rgb(var(--c-rgb) / 0.9);
     border-radius: 14px;
-    box-shadow: 0 0 10px var(--glow-soft);
+    box-shadow: 0 0 10px rgb(var(--c-rgb) / 0.18), inset 0 0 10px rgb(var(--c-rgb) / 0.08);
     outline: none;
     -moz-appearance: textfield;
   }
   .unit input::-webkit-outer-spin-button,
   .unit input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-  .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .chip {
-    height: 42px;
-    border-radius: 21px;
-    border: 1px solid rgba(125, 255, 160, 0.45);
-    background: #000;
-    color: var(--text);
-    font: inherit;
-    font-size: 15px;
-    cursor: pointer;
-  }
-  .chip:active, .chip.sel { background: #123a1c; border-color: var(--green); box-shadow: 0 0 10px var(--glow-soft); }
-
   .row {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     padding: 12px 2px;
-    border-bottom: 1px solid rgba(125, 255, 160, 0.1);
+    border-bottom: 1px solid rgb(var(--c-rgb) / 0.1);
     font-size: 16px;
   }
-  .seg { display: flex; border: 1px solid rgba(125, 255, 160, 0.45); border-radius: 10px; overflow: hidden; }
+  .row .hint { display: block; font-size: 12px; opacity: 0.55; margin-top: 2px; font-family: var(--mono); letter-spacing: 0.02em; }
+  .seg { display: flex; border: 1px solid rgb(var(--c-rgb) / 0.45); border-radius: 10px; overflow: hidden; flex: 0 0 auto; }
   .seg button {
     background: #000;
-    color: var(--text);
     border: none;
     padding: 8px 12px;
-    font: inherit;
     font-size: 14px;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    opacity: 0.7;
+  }
+  .seg button + button { border-left: 1px solid rgb(var(--c-rgb) / 0.2); }
+  .seg button.sel { background: rgb(var(--c-rgb) / 0.2); opacity: 1; }
+  .seg.wide { width: 100%; }
+  .seg.wide button { flex: 1; padding: 11px 0; font-size: 15px; }
+
+  .stepper { display: flex; align-items: center; gap: 8px; }
+  .stepper button {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    border: 1px solid rgb(var(--c-rgb) / 0.4);
+    background: rgb(var(--c-rgb) / 0.05);
+    font-size: 18px;
     cursor: pointer;
   }
-  .seg button.sel { background: #123a1c; color: #c8ffd6; }
+  .stepper output { min-width: 32px; text-align: center; font-family: var(--mono); font-size: 20px; }
+  .mini-time { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 18px; }
+  .mini-time input {
+    width: 54px; height: 38px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 18px;
+    color: rgb(var(--c-rgb));
+    background: #000;
+    border: 1px solid rgb(var(--c-rgb) / 0.5);
+    border-radius: 10px;
+    -moz-appearance: textfield;
+  }
+  .mini-time input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  .summary {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgb(var(--c-rgb) / 0.06);
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0;
+    line-height: 1.5;
+  }
+
+  .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .chip {
+    height: 42px;
+    border-radius: 21px;
+    border: 1px solid rgb(var(--c-rgb) / 0.4);
+    background: #000;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .chip.sel { background: rgb(var(--c-rgb) / 0.2); border-color: rgb(var(--c-rgb)); box-shadow: 0 0 10px rgb(var(--c-rgb) / 0.2); }
+  .custom-list { display: flex; flex-direction: column; gap: 8px; }
+  .custom {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 14px;
+    border: 1px solid rgb(var(--c-rgb) / 0.3);
+    border-radius: 14px;
+  }
+  .custom.sel { border-color: rgb(var(--c-rgb)); background: rgb(var(--c-rgb) / 0.1); }
+  .custom .name { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .custom .dur { font-family: var(--mono); font-size: 14px; opacity: 0.7; }
+  .custom button { height: 34px; border-radius: 10px; border: 1px solid rgb(var(--c-rgb) / 0.35); background: #000; padding: 0 12px; font-size: 13px; cursor: pointer; }
+  .custom .use { grid-column: 1 / 3; text-align: left; border: none; background: none; padding: 0; height: auto; display: flex; justify-content: space-between; gap: 10px; }
+  .empty { font-family: var(--mono); font-size: 13px; opacity: 0.5; padding: 6px 2px; }
+  .save-preset { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+  .save-preset input {
+    height: 44px;
+    padding: 0 14px;
+    font-family: var(--ui);
+    font-size: 16px;
+    color: rgb(var(--c-rgb));
+    background: #000;
+    border: 1px solid rgb(var(--c-rgb) / 0.45);
+    border-radius: 12px;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .save-preset input::placeholder { color: rgb(var(--c-rgb) / 0.35); }
+  .save-preset button, .test-btn {
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1px solid rgb(var(--c-rgb) / 0.6);
+    background: rgb(var(--c-rgb) / 0.12);
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .test-btn { height: 36px; font-size: 14px; }
+
+  input[type="range"] { width: 150px; accent-color: rgb(var(--c-rgb)); }
+
+  .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .swatch {
+    aspect-ratio: 1 / 1;
+    max-width: 100%;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--sw);
+    box-shadow: 0 0 12px var(--sw), inset 0 0 0 3px #000;
+    cursor: pointer;
+  }
+  .swatch.sel { border-color: #fff; }
+  .swatch-names { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 6px; font-family: var(--mono); font-size: 10px; text-align: center; opacity: 0.6; letter-spacing: 0.06em; }
 
   .switch { position: relative; width: 52px; height: 30px; flex: 0 0 auto; }
-  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
   .switch i {
     position: absolute; inset: 0;
     border-radius: 15px;
-    background: #1a1f1b;
-    border: 1px solid rgba(125, 255, 160, 0.35);
+    background: #141816;
+    border: 1px solid rgb(var(--c-rgb) / 0.3);
     transition: background 0.2s;
   }
   .switch i::after {
     content: ""; position: absolute; top: 3px; left: 3px;
     width: 22px; height: 22px; border-radius: 50%;
-    background: #5a6b5e; transition: transform 0.2s, background 0.2s;
+    background: #56605a; transition: transform 0.2s, background 0.2s;
   }
-  .switch input:checked + i { background: #123a1c; border-color: var(--green); }
-  .switch input:checked + i::after { transform: translateX(22px); background: var(--green); box-shadow: 0 0 8px var(--glow); }
+  .switch input:checked + i { background: rgb(var(--c-rgb) / 0.2); border-color: rgb(var(--c-rgb)); }
+  .switch input:checked + i::after { transform: translateX(22px); background: rgb(var(--c-rgb)); box-shadow: 0 0 8px rgb(var(--c-rgb) / 0.7); }
+  .switch input:focus-visible + i { outline: 2px solid rgb(var(--c-rgb)); outline-offset: 2px; }
 
-  .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
-  .sheet-actions button {
-    height: 52px;
-    border-radius: 14px;
-    font: inherit;
-    font-size: 17px;
-    cursor: pointer;
+  .keys { font-family: var(--mono); font-size: 13px; line-height: 1.8; opacity: 0.7; }
+  .keys kbd { display: inline-block; min-width: 26px; padding: 0 6px; border: 1px solid rgb(var(--c-rgb) / 0.4); border-radius: 5px; text-align: center; font-family: inherit; }
+
+  .sheet-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+    border-top: 1px solid rgb(var(--c-rgb) / 0.12);
   }
-  .cancel { background: #000; color: var(--text); border: 1px solid rgba(125, 255, 160, 0.45); }
-  .save { background: var(--green); color: #002a0c; border: none; font-weight: 600; box-shadow: 0 0 16px var(--glow); }
+  .sheet-actions button { height: 52px; border-radius: 14px; font-size: 17px; letter-spacing: 0.05em; cursor: pointer; }
+  .cancel { background: #000; border: 1px solid rgb(var(--c-rgb) / 0.45); }
+  .save { background: rgb(var(--c-rgb)); color: #021006; border: none; font-weight: 600; box-shadow: 0 0 16px rgb(var(--c-rgb) / 0.5); }
+
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001s !important; animation-iteration-count: 1 !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
 <main class="app">
   <section class="panel">
-    <div class="label">TIMER</div>
-    <div class="display" id="display" aria-live="polite" aria-label="00:00:00"></div>
+    <div class="head">
+      <span class="l" id="modeTag">COUNTDOWN</span>
+      <span class="label" id="label">TIMER</span>
+      <span class="r" id="roundTag"></span>
+    </div>
+    <div class="display" id="display" role="timer" aria-live="off" aria-label="00:00:00" title="Tap to open Timer Settings"></div>
+    <div class="status"><span id="statusL">READY</span><span id="statusR"></span></div>
+    <div class="nudges" id="nudges">
+      <button class="nudge" data-d="-60" aria-label="Remove one minute">−1m</button>
+      <button class="nudge" data-d="60" aria-label="Add one minute">+1m</button>
+      <button class="nudge" data-d="300" aria-label="Add five minutes">+5m</button>
+    </div>
     <div class="meter-wrap">
       <div class="meter" id="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+      <div class="scale" aria-hidden="true"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
     </div>
-    <div class="brand">PROTO-TIMER</div>
+    <div class="brand">PROTO-TIMER<small>v2</small></div>
   </section>
 
   <nav class="controls">
-    <button class="btn" id="startBtn">START</button>
-    <button class="btn" id="stopBtn">STOP</button>
-    <button class="btn" id="resetBtn">RESET</button>
-    <button class="btn small" id="settingsBtn">TIMER<br>SETTINGS</button>
+    <button class="btn" id="startBtn" aria-label="Start">
+      <span class="led"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>
+      <span>START</span>
+    </button>
+    <button class="btn" id="stopBtn" aria-label="Stop">
+      <span class="led"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+      <span>STOP</span>
+    </button>
+    <button class="btn" id="resetBtn" aria-label="Reset">
+      <span class="led"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg>
+      <span>RESET</span>
+    </button>
+    <button class="btn" id="settingsBtn" aria-label="Timer settings">
+      <span class="led"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      <span class="t2">SETTINGS</span>
+    </button>
   </nav>
 </main>
 
+<div class="toast" id="toast" role="status"></div>
+
 <div class="sheet-backdrop" id="sheet">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-    <h2 id="sheetTitle">Timer Settings</h2>
-
-    <div class="section-title">Time limit</div>
-    <div class="time-picker">
-      <div class="unit">
-        <button class="step" data-unit="h" data-d="1">▲</button>
-        <input id="inH" type="number" inputmode="numeric" min="0" max="99" value="0">
-        <button class="step" data-unit="h" data-d="-1">▼</button>
-        <span>HOURS</span>
-      </div>
-      <div class="unit">
-        <button class="step" data-unit="m" data-d="1">▲</button>
-        <input id="inM" type="number" inputmode="numeric" min="0" max="59" value="0">
-        <button class="step" data-unit="m" data-d="-1">▼</button>
-        <span>MINUTES</span>
-      </div>
-      <div class="unit">
-        <button class="step" data-unit="s" data-d="1">▲</button>
-        <input id="inS" type="number" inputmode="numeric" min="0" max="59" value="0">
-        <button class="step" data-unit="s" data-d="-1">▼</button>
-        <span>SECONDS</span>
+    <div class="sheet-top">
+      <h2 id="sheetTitle">Timer Settings</h2>
+      <div class="tabs" role="tablist">
+        <button class="tab sel" data-tab="time" role="tab">Time</button>
+        <button class="tab" data-tab="presets" role="tab">Presets</button>
+        <button class="tab" data-tab="sound" role="tab">Sound</button>
+        <button class="tab" data-tab="look" role="tab">Look</button>
       </div>
     </div>
 
-    <div class="section-title">Presets</div>
-    <div class="presets" id="presets"></div>
+    <div class="sheet-body">
+      <!-- TIME -->
+      <div class="pane sel" data-pane="time">
+        <div class="section-title">Mode</div>
+        <div class="seg wide" id="modeSeg">
+          <button data-v="countdown">Countdown</button>
+          <button data-v="stopwatch">Stopwatch</button>
+        </div>
 
-    <div class="section-title">Options</div>
-    <div class="row">
-      <span>Bars show</span>
-      <div class="seg" id="barMode">
-        <button data-v="charge">Charge up</button>
-        <button data-v="drain">Drain</button>
+        <div id="countdownOpts">
+          <div class="section-title">Time limit</div>
+          <div class="time-picker">
+            <div class="unit">
+              <button class="step" data-unit="h" data-d="1" aria-label="More hours">▲</button>
+              <input id="inH" type="number" inputmode="numeric" min="0" max="99" aria-label="Hours">
+              <button class="step" data-unit="h" data-d="-1" aria-label="Fewer hours">▼</button>
+              <span>HOURS</span>
+            </div>
+            <div class="unit">
+              <button class="step" data-unit="m" data-d="1" aria-label="More minutes">▲</button>
+              <input id="inM" type="number" inputmode="numeric" min="0" max="59" aria-label="Minutes">
+              <button class="step" data-unit="m" data-d="-1" aria-label="Fewer minutes">▼</button>
+              <span>MINUTES</span>
+            </div>
+            <div class="unit">
+              <button class="step" data-unit="s" data-d="1" aria-label="More seconds">▲</button>
+              <input id="inS" type="number" inputmode="numeric" min="0" max="59" aria-label="Seconds">
+              <button class="step" data-unit="s" data-d="-1" aria-label="Fewer seconds">▼</button>
+              <span>SECONDS</span>
+            </div>
+          </div>
+
+          <div class="section-title">Intervals</div>
+          <div class="row">
+            <span>Rounds<span class="hint">Repeat the time limit</span></span>
+            <div class="stepper">
+              <button id="roundsDown" aria-label="Fewer rounds">−</button>
+              <output id="roundsOut">1</output>
+              <button id="roundsUp" aria-label="More rounds">+</button>
+            </div>
+          </div>
+          <div class="row" id="restRow">
+            <span>Rest between rounds<span class="hint">Bars turn blue while resting</span></span>
+            <div class="mini-time">
+              <input id="restM" type="number" inputmode="numeric" min="0" max="59" aria-label="Rest minutes">:<input id="restS" type="number" inputmode="numeric" min="0" max="59" aria-label="Rest seconds">
+            </div>
+          </div>
+          <div class="summary" id="summary"></div>
+        </div>
+
+        <div id="stopwatchOpts" class="hidden">
+          <div class="summary">Counts up from 00:00:00 to 99:59:59. The bars fill once every minute, and the status line shows how many full minutes have passed.</div>
+        </div>
+      </div>
+
+      <!-- PRESETS -->
+      <div class="pane" data-pane="presets">
+        <div class="section-title">Quick presets</div>
+        <div class="presets" id="presets"></div>
+        <div class="section-title">My presets</div>
+        <div class="custom-list" id="customList"></div>
+        <div class="save-preset">
+          <input id="presetName" type="text" maxlength="24" placeholder="Name, e.g. Tea, Workout" aria-label="Preset name">
+          <button id="savePresetBtn">Save current</button>
+        </div>
+        <div class="summary" id="presetSummary"></div>
+      </div>
+
+      <!-- SOUND -->
+      <div class="pane" data-pane="sound">
+        <div class="section-title">Alarm</div>
+        <label class="row"><span>Alarm sound</span><span class="switch"><input type="checkbox" id="optSound"><i></i></span></label>
+        <div class="row">
+          <span>Tone</span>
+          <div class="seg" id="toneSeg">
+            <button data-v="beep">Beep</button>
+            <button data-v="chime">Chime</button>
+            <button data-v="pulse">Pulse</button>
+          </div>
+        </div>
+        <div class="row">
+          <span>Volume</span>
+          <input type="range" id="optVolume" min="5" max="100" step="5" aria-label="Volume">
+        </div>
+        <div class="row">
+          <span>Preview the tone</span>
+          <button class="test-btn" id="testBtn">Play test</button>
+        </div>
+        <div class="section-title">Cues</div>
+        <label class="row"><span>Final countdown ticks<span class="hint">Soft tick in the last 5 seconds</span></span><span class="switch"><input type="checkbox" id="optTicks"><i></i></span></label>
+        <label class="row"><span>Round change chime<span class="hint">When work or rest starts</span></span><span class="switch"><input type="checkbox" id="optCues"><i></i></span></label>
+        <label class="row"><span>Vibrate</span><span class="switch"><input type="checkbox" id="optVibrate"><i></i></span></label>
+      </div>
+
+      <!-- LOOK -->
+      <div class="pane" data-pane="look">
+        <div class="section-title">Glow colour</div>
+        <div class="swatches" id="swatches"></div>
+        <div class="swatch-names" id="swatchNames"></div>
+        <div class="section-title">Meter</div>
+        <div class="row">
+          <span>Bars show</span>
+          <div class="seg" id="barSeg">
+            <button data-v="charge">Charge up</button>
+            <button data-v="drain">Drain</button>
+          </div>
+        </div>
+        <label class="row"><span>Warning colours<span class="hint">Amber at 15% left, red in the last 10 s</span></span><span class="switch"><input type="checkbox" id="optUrgency"><i></i></span></label>
+        <label class="row"><span>Keep screen on while running</span><span class="switch"><input type="checkbox" id="optWake"><i></i></span></label>
+        <div class="section-title">Keyboard</div>
+        <div class="keys"><kbd>Space</kbd> start / stop &nbsp; <kbd>R</kbd> reset &nbsp; <kbd>S</kbd> settings &nbsp; <kbd>+</kbd> add 1 min</div>
       </div>
     </div>
-    <label class="row"><span>Alarm sound</span><span class="switch"><input type="checkbox" id="optSound"><i></i></span></label>
-    <label class="row"><span>Vibrate on finish</span><span class="switch"><input type="checkbox" id="optVibrate"><i></i></span></label>
-    <label class="row"><span>Keep screen on while running</span><span class="switch"><input type="checkbox" id="optWake"><i></i></span></label>
 
     <div class="sheet-actions">
       <button class="cancel" id="cancelBtn">Cancel</button>
@@ -398,17 +802,47 @@
 (() => {
   'use strict';
 
-  // ---------- Settings (persisted) ----------
-  const DEFAULTS = { duration: 45 * 60, barMode: 'charge', sound: true, vibrate: true, wake: true };
-  const STORE_KEY = 'proto-timer-settings';
-  let settings = { ...DEFAULTS };
-  try { Object.assign(settings, JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); } catch (_) {}
-  const saveSettings = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (_) {} };
+  // ================= Settings =================
+  const DEFAULTS = {
+    mode: 'countdown', duration: 45 * 60, rounds: 1, rest: 0,
+    sound: true, tone: 'beep', volume: 70, ticks: true, cues: true, vibrate: true,
+    accent: 'green', barMode: 'charge', urgency: true, wake: true,
+    presets: [],
+  };
+  const STORE_KEY = 'proto-timer-v2';
+  const store = {
+    load() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) return JSON.parse(raw);
+        const v1 = JSON.parse(localStorage.getItem('proto-timer-settings') || 'null'); // carry over v1 choices
+        return v1 || {};
+      } catch (_) { return {}; }
+    },
+    save(v) { try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (_) {} },
+  };
+  let settings = { ...DEFAULTS, ...store.load() };
+  if (!Array.isArray(settings.presets)) settings.presets = [];
 
   const BAR_COUNT = 25;
   const MAX_SECONDS = 99 * 3600 + 59 * 60 + 59;
+  const ACCENTS = [
+    ['green', 'GREEN', '#7dffa0'], ['amber', 'AMBER', '#ffbe5c'], ['cyan', 'CYAN', '#6eeeff'],
+    ['red', 'RED', '#ff6876'], ['violet', 'VIOLET', '#c4a0ff'], ['white', 'WHITE', '#e1f0e8'],
+  ];
 
-  // ---------- 7-segment digits ----------
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, '0');
+  const hms = s => `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+  function friendly(sec) {
+    if (sec <= 0) return '0 s';
+    const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
+    return [h && `${h} h`, m && `${m} min`, s && `${s} s`].filter(Boolean).join(' ');
+  }
+  const applyAccent = a => document.documentElement.setAttribute('data-accent', a);
+  applyAccent(settings.accent);
+
+  // ================= 7-segment digits =================
   const SEGMENTS = {
     a: '10,7 16,1 44,1 50,7 44,13 16,13',
     b: '53,11 59,17 59,43 53,49 47,43 47,17',
@@ -420,125 +854,120 @@
   };
   const DIGIT_SEGS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
   const SVG_NS = 'http://www.w3.org/2000/svg';
-
-  const displayEl = document.getElementById('display');
+  const displayEl = $('display');
   const digits = [];
 
-  function makeDigit() {
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('viewBox', '-4 0 70 100');
-    svg.classList.add('digit');
-    const g = document.createElementNS(SVG_NS, 'g');
-    g.setAttribute('transform', 'skewX(-6) translate(6 0)');
-    const segs = {};
-    for (const [k, pts] of Object.entries(SEGMENTS)) {
-      const p = document.createElementNS(SVG_NS, 'polygon');
-      p.setAttribute('points', pts);
-      g.appendChild(p);
-      segs[k] = p;
-    }
-    svg.appendChild(g);
-    displayEl.appendChild(svg);
-    return segs;
-  }
-  function makeColon() {
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('viewBox', '0 0 14 100');
-    svg.classList.add('colon');
-    for (const [cx, cy] of [[8, 32], [5, 70]]) {
-      const c = document.createElementNS(SVG_NS, 'circle');
-      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', 5);
-      svg.appendChild(c);
-    }
-    displayEl.appendChild(svg);
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
   }
   for (let i = 0; i < 6; i++) {
-    digits.push(makeDigit());
-    if (i === 1 || i === 3) makeColon();
+    const svg = svgEl('svg', { viewBox: '-4 0 70 100', class: 'digit', 'aria-hidden': 'true' });
+    const g = svgEl('g', { transform: 'skewX(-6) translate(6 0)' });
+    const segs = {};
+    for (const [k, pts] of Object.entries(SEGMENTS)) g.appendChild(segs[k] = svgEl('polygon', { points: pts }));
+    svg.appendChild(g);
+    displayEl.appendChild(svg);
+    digits.push(segs);
+    if (i === 1 || i === 3) {
+      const colon = svgEl('svg', { viewBox: '0 0 14 100', class: 'colon', 'aria-hidden': 'true' });
+      colon.appendChild(svgEl('circle', { cx: 8, cy: 32, r: 5 }));
+      colon.appendChild(svgEl('circle', { cx: 5, cy: 70, r: 5 }));
+      displayEl.appendChild(colon);
+    }
   }
-
   let lastText = '';
   function renderTime(totalSec) {
-    const s = Math.max(0, Math.min(MAX_SECONDS, totalSec));
-    const text = [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60]
-      .map(n => String(n).padStart(2, '0')).join('');
+    const text = hms(Math.max(0, Math.min(MAX_SECONDS, totalSec))).replace(/:/g, '');
     if (text === lastText) return;
     lastText = text;
     for (let i = 0; i < 6; i++) {
       const on = DIGIT_SEGS[+text[i]];
-      for (const [k, el] of Object.entries(digits[i])) el.classList.toggle('on', on.includes(k));
+      for (const k in digits[i]) digits[i][k].classList.toggle('on', on.includes(k));
     }
     displayEl.setAttribute('aria-label', `${text.slice(0, 2)}:${text.slice(2, 4)}:${text.slice(4)}`);
   }
 
-  // ---------- Bars ----------
-  const meterEl = document.getElementById('meter');
-  const bars = Array.from({ length: BAR_COUNT }, () => {
-    const b = document.createElement('div');
-    b.className = 'bar';
-    meterEl.appendChild(b);
-    return b;
-  });
+  // ================= Meter =================
+  const meterEl = $('meter');
+  const bars = Array.from({ length: BAR_COUNT }, () => meterEl.appendChild(Object.assign(document.createElement('div'), { className: 'bar' })));
 
-  function renderBars(elapsedFrac, running) {
-    const frac = settings.barMode === 'drain' ? 1 - elapsedFrac : elapsedFrac;
-    const exact = Math.max(0, Math.min(1, frac)) * BAR_COUNT;
-    const lit = settings.barMode === 'drain' ? Math.ceil(exact - 1e-9) : Math.floor(exact + 1e-9);
-    // The bar currently being charged / drained pulses while running.
-    const activeIdx = running ? (settings.barMode === 'drain' ? lit - 1 : lit) : -1;
+  function renderBars(elapsedFrac, active, drain) {
+    const frac = Math.max(0, Math.min(1, drain ? 1 - elapsedFrac : elapsedFrac));
+    const exact = frac * BAR_COUNT;
+    const lit = drain ? Math.ceil(exact - 1e-9) : Math.floor(exact + 1e-9);
+    const pulse = active ? (drain ? lit - 1 : lit) : -1; // the bar being charged / drained
     bars.forEach((b, i) => {
-      const charging = i === activeIdx && i >= 0 && i < BAR_COUNT;
+      const charging = i === pulse;
       b.classList.toggle('on', i < lit && !charging);
       b.classList.toggle('charging', charging);
     });
-    meterEl.setAttribute('aria-valuenow', Math.round(elapsedFrac * 100));
+    meterEl.setAttribute('aria-valuenow', Math.round(frac * 100));
   }
 
-  // ---------- Timer state ----------
-  // Time is derived from Date.now() so it stays accurate even if the tab is throttled.
-  let remainingMs = settings.duration * 1000;
-  let endAt = 0;           // timestamp when the running timer hits zero
+  // ================= Timer engine =================
+  // Everything is derived from Date.now(), so a throttled or backgrounded tab stays accurate.
+  let phases = [];      // [{type:'work'|'rest', ms, round}]
+  let idx = 0;          // current phase
+  let remMs = 0;        // remaining in current phase while paused
+  let endAt = 0;        // phase end timestamp while running
+  let swElapsed = 0;    // stopwatch elapsed while paused
+  let swStart = 0;      // stopwatch start timestamp while running
   let running = false;
   let finished = false;
+  let finishedAt = 0;
   let rafId = 0;
+  let overtimeTimer = 0;
+  let lastTickSec = -1;
+  let sessionStarted = false;
 
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
+  const isCountdown = () => settings.mode === 'countdown';
 
-  function currentRemaining() {
-    return running ? Math.max(0, endAt - Date.now()) : remainingMs;
+  function buildPhases() {
+    const list = [];
+    const ms = settings.duration * 1000;
+    for (let r = 1; r <= settings.rounds; r++) {
+      list.push({ type: 'work', ms, round: r });
+      if (r < settings.rounds && settings.rest > 0) list.push({ type: 'rest', ms: settings.rest * 1000, round: r });
+    }
+    return list;
   }
 
-  function render() {
-    const rem = currentRemaining();
-    const total = settings.duration * 1000;
-    renderTime(Math.ceil(rem / 1000));
-    renderBars(total > 0 ? 1 - rem / total : 0, running);
-    startBtn.classList.toggle('active', running);
-    startBtn.disabled = finished || settings.duration === 0;
+  function resetState() {
+    running = false;
+    finished = false;
+    sessionStarted = false;
+    cancelAnimationFrame(rafId);
+    clearInterval(overtimeTimer);
+    phases = buildPhases();
+    idx = 0;
+    remMs = phases[0].ms;
+    swElapsed = 0;
+    lastTickSec = -1;
   }
 
-  function tick() {
-    if (!running) return;
-    if (Date.now() >= endAt) return finish();
-    render();
-    rafId = requestAnimationFrame(tick);
-  }
+  const phaseRemaining = () => running ? Math.max(0, endAt - Date.now()) : remMs;
+  const swNow = () => running ? Date.now() - swStart : swElapsed;
 
   function start() {
-    if (running || finished || settings.duration === 0) return;
-    if (remainingMs <= 0) remainingMs = settings.duration * 1000;
-    endAt = Date.now() + remainingMs;
-    running = true;
+    if (running) return;
+    if (finished) { reset(); }
+    if (isCountdown() && settings.duration === 0) { openSettings(); return; }
     unlockAudio();
+    running = true;
+    sessionStarted = true;
+    if (isCountdown()) endAt = Date.now() + remMs;
+    else swStart = Date.now() - swElapsed;
     requestWakeLock();
-    tick();
+    loop();
   }
 
   function stop() {
-    if (finished) { silenceAlarm(); finished = false; remainingMs = 0; render(); return; }
+    if (finished) { silence(); render(); return; }
     if (!running) return;
-    remainingMs = Math.max(0, endAt - Date.now());
+    if (isCountdown()) remMs = Math.max(0, endAt - Date.now());
+    else swElapsed = Date.now() - swStart;
     running = false;
     cancelAnimationFrame(rafId);
     releaseWakeLock();
@@ -546,77 +975,225 @@
   }
 
   function reset() {
-    running = false;
-    cancelAnimationFrame(rafId);
-    silenceAlarm();
-    finished = false;
-    remainingMs = settings.duration * 1000;
+    silence();
+    resetState();
     releaseWakeLock();
     render();
   }
 
-  function finish() {
+  function toggle() { running ? stop() : start(); }
+
+  function loop() {
+    if (!running) return;
+    if (isCountdown()) {
+      const now = Date.now();
+      // Catch up across any phase boundaries that passed (e.g. while the screen was off).
+      while (now >= endAt) {
+        if (idx >= phases.length - 1) return finish(endAt);
+        idx++;
+        endAt += phases[idx].ms;
+        if (now < endAt) phaseCue(phases[idx]);
+      }
+      const secLeft = Math.ceil((endAt - now) / 1000);
+      if (settings.ticks && secLeft <= 5 && secLeft >= 1 && secLeft !== lastTickSec && phases[idx].ms >= 10000) {
+        lastTickSec = secLeft;
+        tickSound();
+      }
+    }
+    render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function finish(at) {
     running = false;
     finished = true;
-    remainingMs = 0;
+    finishedAt = at || Date.now();
+    remMs = 0;
     cancelAnimationFrame(rafId);
-    render();
     displayEl.classList.add('blink');
     meterEl.classList.add('done');
-    if (settings.vibrate && navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 800]);
     if (settings.sound) playAlarm();
+    if (settings.vibrate) vibrate([400, 200, 400, 200, 800]);
     releaseWakeLock();
+    clearInterval(overtimeTimer);
+    overtimeTimer = setInterval(render, 500);
+    render();
   }
 
-  function silenceAlarm() {
+  function silence() {
     displayEl.classList.remove('blink');
     meterEl.classList.remove('done');
     stopAlarm();
-    if (navigator.vibrate) navigator.vibrate(0);
+    vibrate(0);
   }
 
-  // ---------- Audio alarm (Web Audio, no files needed) ----------
-  let audioCtx = null;
-  let alarmTimer = 0;
-  let alarmStopAt = 0;
+  // Add or remove time from the current countdown phase.
+  function nudge(sec) {
+    if (!isCountdown()) return;
+    const d = sec * 1000;
+    if (finished) {
+      if (d <= 0) return;
+      silence();
+      clearInterval(overtimeTimer);
+      finished = false;
+      phases = [{ type: 'work', ms: d, round: 1 }];
+      idx = 0;
+      remMs = d;
+      lastTickSec = -1;
+      start();
+      toast(`Snooze ${friendly(sec)}`);
+      return;
+    }
+    const ph = phases[idx];
+    const rem = phaseRemaining();
+    const next = Math.max(1000, Math.min(MAX_SECONDS * 1000, rem + d));
+    const applied = next - rem;
+    ph.ms = Math.max(next, ph.ms + applied);
+    if (running) endAt += applied; else remMs = next;
+    lastTickSec = -1;
+    toast(`${applied >= 0 ? '+' : '−'}${friendly(Math.round(Math.abs(applied) / 1000))}`);
+    render();
+  }
+
+  // ================= Rendering =================
+  const labelEl = $('label'), modeTag = $('modeTag'), roundTag = $('roundTag');
+  const statusL = $('statusL'), statusR = $('statusR'), nudgesEl = $('nudges');
+  const startBtn = $('startBtn'), stopBtn = $('stopBtn');
+
+  function clockTime(ts) {
+    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function render() {
+    const drain = settings.barMode === 'drain';
+    let warn = false, crit = false, rest = false;
+
+    if (isCountdown()) {
+      const ph = phases[idx];
+      const rem = finished ? 0 : phaseRemaining();
+      const elapsedFrac = ph.ms > 0 ? 1 - rem / ph.ms : 0;
+      rest = ph.type === 'rest' && !finished;
+      renderTime(Math.ceil(rem / 1000));
+      renderBars(finished ? 1 : elapsedFrac, running, drain);
+
+      if (settings.urgency && !rest && !finished && sessionStarted) {
+        crit = rem <= 10000 && ph.ms >= 30000;
+        warn = !crit && rem / ph.ms <= 0.15;
+      }
+
+      modeTag.textContent = settings.rounds > 1 ? 'INTERVAL' : 'COUNTDOWN';
+      labelEl.textContent = rest ? 'REST' : 'TIMER';
+      roundTag.textContent = settings.rounds > 1 ? `RND ${ph.round}/${settings.rounds}` : '';
+
+      if (finished) {
+        statusL.textContent = 'TIME UP';
+        statusR.textContent = `+${hms(Math.floor((Date.now() - finishedAt) / 1000))}`;
+      } else if (running) {
+        const totalLeft = rem + phases.slice(idx + 1).reduce((a, p) => a + p.ms, 0);
+        statusL.textContent = `ENDS ${clockTime(Date.now() + totalLeft)}`;
+        statusR.textContent = `${Math.floor(elapsedFrac * 100)}%`;
+      } else if (sessionStarted) {
+        statusL.textContent = 'PAUSED';
+        statusR.textContent = `${Math.floor(elapsedFrac * 100)}%`;
+      } else {
+        statusL.textContent = 'READY';
+        statusR.textContent = friendly(Math.round(ph.ms / 1000)).toUpperCase();
+      }
+      nudgesEl.classList.remove('hide');
+    } else {
+      const el = swNow();
+      renderTime(Math.floor(el / 1000));
+      renderBars((el % 60000) / 60000, running, drain);
+      modeTag.textContent = 'STOPWATCH';
+      labelEl.textContent = 'TIMER';
+      roundTag.textContent = '';
+      statusL.textContent = running ? `STARTED ${clockTime(Date.now() - el)}` : sessionStarted ? 'PAUSED' : 'READY';
+      statusR.textContent = `MIN ${Math.floor(el / 60000)}`;
+      nudgesEl.classList.add('hide');
+    }
+
+    labelEl.classList.toggle('rest', rest);
+    meterEl.classList.toggle('rest', rest);
+    meterEl.classList.toggle('warn', warn);
+    meterEl.classList.toggle('crit', crit);
+    displayEl.classList.toggle('rest', rest);
+    displayEl.classList.toggle('crit', crit);
+    displayEl.classList.toggle('paused', !running && sessionStarted && !finished);
+    startBtn.classList.toggle('lit', running);
+    stopBtn.classList.toggle('lit', (!running && sessionStarted) || finished);
+    startBtn.querySelector('span:last-child').textContent = !running && sessionStarted && !finished ? 'RESUME' : 'START';
+  }
+
+  // ================= Sound =================
+  let audioCtx = null, master = null;
+  let alarmTimer = 0, alarmStopAt = 0;
 
   function unlockAudio() {
     try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        master = audioCtx.createGain();
+        master.connect(audioCtx.destination);
+        master.gain.value = ((draft || settings).volume / 100) ** 1.6;
+      }
       if (audioCtx.state === 'suspended') audioCtx.resume();
-    } catch (_) {}
+    } catch (_) { audioCtx = null; }
+    return !!audioCtx;
   }
-  function beep(t, freq) {
+  function note(t, freq, len, type = 'sine', peak = 0.5) {
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    o.type = 'square';
+    o.type = type;
     o.frequency.value = freq;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-    o.connect(g).connect(audioCtx.destination);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g).connect(master);
     o.start(t);
-    o.stop(t + 0.16);
+    o.stop(t + len + 0.02);
+  }
+  const TONES = {
+    beep:  { every: 1400, play: t => { for (let i = 0; i < 4; i++) note(t + i * 0.2, 1760, 0.13, 'square', 0.22); } },
+    chime: { every: 2200, play: t => { [1047, 1319, 1568, 2093].forEach((f, i) => note(t + i * 0.16, f, 0.9, 'sine', 0.45)); } },
+    pulse: { every: 1300, play: t => { note(t, 660, 0.34, 'triangle', 0.6); note(t + 0.45, 660, 0.34, 'triangle', 0.6); } },
+  };
+  function playTone(tone) {
+    if (!unlockAudio()) return;
+    (TONES[tone] || TONES.beep).play(audioCtx.currentTime + 0.03);
   }
   function playAlarm() {
-    unlockAudio();
-    if (!audioCtx) return;
+    stopAlarm();
+    if (!unlockAudio()) return;
     alarmStopAt = Date.now() + 60000; // ring for up to one minute
+    const tone = TONES[settings.tone] || TONES.beep;
     const burst = () => {
       if (Date.now() > alarmStopAt) return stopAlarm();
-      const t = audioCtx.currentTime + 0.02;
-      for (let i = 0; i < 4; i++) beep(t + i * 0.2, 1760);
-      if (settings.vibrate && navigator.vibrate) navigator.vibrate([150, 50, 150, 50, 150, 50, 150]);
+      tone.play(audioCtx.currentTime + 0.03);
+      if (settings.vibrate) vibrate([150, 60, 150, 60, 150]);
     };
     burst();
-    alarmTimer = setInterval(burst, 1400);
+    alarmTimer = setInterval(burst, tone.every);
   }
   function stopAlarm() { clearInterval(alarmTimer); alarmTimer = 0; }
+  function tickSound() {
+    if (!settings.sound || !unlockAudio()) return;
+    note(audioCtx.currentTime + 0.01, 1200, 0.05, 'sine', 0.35);
+  }
+  function phaseCue(ph) {
+    if (settings.cues && settings.sound && unlockAudio()) {
+      const t = audioCtx.currentTime + 0.02;
+      if (ph.type === 'rest') { note(t, 1320, 0.35); note(t + 0.18, 880, 0.5); }
+      else { note(t, 880, 0.3); note(t + 0.15, 1320, 0.3); note(t + 0.3, 1760, 0.5); }
+    }
+    if (settings.vibrate) vibrate(ph.type === 'rest' ? [200] : [120, 80, 120]);
+    lastTickSec = -1;
+  }
+  function vibrate(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (_) {} }
 
-  // ---------- Screen wake lock ----------
+  // ================= Wake lock =================
   let wakeLock = null;
   async function requestWakeLock() {
-    if (!settings.wake || !('wakeLock' in navigator)) return;
+    if (!settings.wake || wakeLock || !('wakeLock' in navigator)) return;
     try {
       wakeLock = await navigator.wakeLock.request('screen');
       wakeLock.addEventListener('release', () => { wakeLock = null; });
@@ -625,123 +1202,258 @@
   function releaseWakeLock() { if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-    if (running && !wakeLock) requestWakeLock();
-    if (running && Date.now() >= endAt) finish();
-    else render();
+    if (running) { requestWakeLock(); loop(); } else render();
   });
 
-  // ---------- Settings sheet ----------
-  const sheet = document.getElementById('sheet');
-  const inH = document.getElementById('inH');
-  const inM = document.getElementById('inM');
-  const inS = document.getElementById('inS');
-  const inputs = { h: inH, m: inM, s: inS };
-  const limits = { h: 99, m: 59, s: 59 };
-  const barModeEl = document.getElementById('barMode');
-  const optSound = document.getElementById('optSound');
-  const optVibrate = document.getElementById('optVibrate');
-  const optWake = document.getElementById('optWake');
-  const presetsEl = document.getElementById('presets');
-  let draftBarMode = settings.barMode;
+  // ================= Toast =================
+  const toastEl = $('toast');
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1600);
+  }
 
+  // ================= Settings sheet =================
+  const sheet = $('sheet');
+  const inputs = { h: $('inH'), m: $('inM'), s: $('inS') };
+  const limits = { h: 99, m: 59, s: 59 };
+  let draft = null;
+
+  const clampNum = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+  const readDuration = () => clampNum(inputs.h.value, 99) * 3600 + clampNum(inputs.m.value, 59) * 60 + clampNum(inputs.s.value, 59);
+  function writeDuration(sec) {
+    inputs.h.value = Math.floor(sec / 3600);
+    inputs.m.value = Math.floor(sec / 60) % 60;
+    inputs.s.value = sec % 60;
+  }
+  const readRest = () => clampNum($('restM').value, 59) * 60 + clampNum($('restS').value, 59);
+
+  function syncSeg(segId, value) {
+    $(segId).querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === value));
+  }
+  function bindSeg(segId, key, after) {
+    $(segId).addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      draft[key] = b.dataset.v;
+      syncSeg(segId, draft[key]);
+      if (after) after();
+    });
+  }
+
+  function refreshDraftViews() {
+    draft.duration = readDuration();
+    draft.rest = readRest();
+    const cd = draft.mode === 'countdown';
+    $('countdownOpts').classList.toggle('hidden', !cd);
+    $('stopwatchOpts').classList.toggle('hidden', cd);
+    $('roundsOut').textContent = draft.rounds;
+    $('restRow').classList.toggle('hidden', draft.rounds < 2);
+
+    const total = draft.duration * draft.rounds + (draft.rounds > 1 ? draft.rest * (draft.rounds - 1) : 0);
+    $('summary').textContent = draft.duration === 0
+      ? 'Set a time limit above, or pick a preset.'
+      : draft.rounds > 1
+        ? `${draft.rounds} rounds of ${friendly(draft.duration)}${draft.rest ? ` with ${friendly(draft.rest)} rest` : ''}. Total ${friendly(total)}.`
+        : `One countdown of ${friendly(draft.duration)}.`;
+    $('presetSummary').textContent = `Current time limit: ${hms(draft.duration)}${draft.rounds > 1 ? ` × ${draft.rounds} rounds` : ''}`;
+
+    document.querySelectorAll('#presets .chip').forEach(c =>
+      c.classList.toggle('sel', +c.dataset.sec === draft.duration && draft.rounds === 1));
+    renderCustomPresets();
+  }
+
+  // Built-in presets
   const PRESETS = [
     ['1 min', 60], ['3 min', 180], ['5 min', 300], ['10 min', 600],
-    ['15 min', 900], ['30 min', 1800], ['45 min', 2700], ['1 hr', 3600],
+    ['15 min', 900], ['25 min', 1500], ['45 min', 2700], ['1 hr', 3600],
   ];
   PRESETS.forEach(([label, sec]) => {
-    const b = document.createElement('button');
-    b.className = 'chip';
-    b.textContent = label;
+    const b = Object.assign(document.createElement('button'), { className: 'chip', textContent: label });
     b.dataset.sec = sec;
-    b.addEventListener('click', () => { setInputs(sec); markPreset(); });
-    presetsEl.appendChild(b);
+    b.addEventListener('click', () => {
+      writeDuration(sec);
+      draft.mode = 'countdown';
+      draft.rounds = 1;
+      syncSeg('modeSeg', 'countdown');
+      refreshDraftViews();
+    });
+    $('presets').appendChild(b);
   });
 
-  const clampUnit = (u, v) => Math.max(0, Math.min(limits[u], Math.floor(Number(v) || 0)));
-  function setInputs(sec) {
-    inH.value = Math.floor(sec / 3600);
-    inM.value = Math.floor(sec / 60) % 60;
-    inS.value = sec % 60;
+  function renderCustomPresets() {
+    const list = $('customList');
+    list.textContent = '';
+    if (!draft.presets.length) {
+      list.appendChild(Object.assign(document.createElement('div'), { className: 'empty', textContent: 'No saved presets yet. Set a time on the Time tab, name it below and tap Save current.' }));
+      return;
+    }
+    draft.presets.forEach((p, i) => {
+      const row = document.createElement('div');
+      const matches = p.duration === draft.duration && p.rounds === draft.rounds && p.rest === draft.rest && draft.mode === 'countdown';
+      row.className = 'custom' + (matches ? ' sel' : '');
+      const use = document.createElement('button');
+      use.className = 'use';
+      const name = Object.assign(document.createElement('span'), { className: 'name', textContent: p.name });
+      const dur = Object.assign(document.createElement('span'), { className: 'dur', textContent: hms(p.duration) + (p.rounds > 1 ? ` ×${p.rounds}` : '') });
+      use.append(name, dur);
+      use.addEventListener('click', () => {
+        draft.mode = 'countdown';
+        draft.rounds = p.rounds;
+        writeDuration(p.duration);
+        $('restM').value = Math.floor(p.rest / 60);
+        $('restS').value = p.rest % 60;
+        syncSeg('modeSeg', 'countdown');
+        refreshDraftViews();
+      });
+      const del = Object.assign(document.createElement('button'), { textContent: 'Delete' });
+      del.setAttribute('aria-label', `Delete preset ${p.name}`);
+      del.addEventListener('click', () => { draft.presets.splice(i, 1); renderCustomPresets(); });
+      row.append(use, del);
+      list.appendChild(row);
+    });
   }
-  function inputSeconds() {
-    return clampUnit('h', inH.value) * 3600 + clampUnit('m', inM.value) * 60 + clampUnit('s', inS.value);
-  }
-  function markPreset() {
-    const sec = inputSeconds();
-    presetsEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('sel', +c.dataset.sec === sec));
-  }
-  function markBarMode() {
-    barModeEl.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === draftBarMode));
-  }
+  $('savePresetBtn').addEventListener('click', () => {
+    refreshDraftViews();
+    if (draft.duration === 0) { toast('Set a time limit first'); return; }
+    const name = $('presetName').value.trim() || friendly(draft.duration);
+    draft.presets.push({ name, duration: draft.duration, rounds: draft.rounds, rest: draft.rest });
+    $('presetName').value = '';
+    renderCustomPresets();
+    toast(`Saved “${name}”`);
+  });
 
+  // Time inputs
   document.querySelectorAll('.step').forEach(btn => {
     btn.addEventListener('click', () => {
-      const u = btn.dataset.unit;
-      const el = inputs[u];
-      const max = limits[u];
-      let v = clampUnit(u, el.value) + Number(btn.dataset.d);
+      const u = btn.dataset.unit, max = limits[u];
+      let v = clampNum(inputs[u].value, max) + Number(btn.dataset.d);
       if (v > max) v = 0;
       if (v < 0) v = max;
-      el.value = v;
-      markPreset();
+      inputs[u].value = v;
+      refreshDraftViews();
     });
   });
-  Object.entries(inputs).forEach(([u, el]) => {
+  [...Object.values(inputs), $('restM'), $('restS')].forEach(el => {
     el.addEventListener('focus', () => el.select());
-    el.addEventListener('input', markPreset);
-    el.addEventListener('blur', () => { el.value = clampUnit(u, el.value); markPreset(); });
+    el.addEventListener('input', refreshDraftViews);
+    el.addEventListener('blur', () => { el.value = clampNum(el.value, +el.max); refreshDraftViews(); });
   });
-  barModeEl.addEventListener('click', e => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    draftBarMode = b.dataset.v;
-    markBarMode();
+  $('roundsDown').addEventListener('click', () => { draft.rounds = Math.max(1, draft.rounds - 1); refreshDraftViews(); });
+  $('roundsUp').addEventListener('click', () => { draft.rounds = Math.min(20, draft.rounds + 1); refreshDraftViews(); });
+
+  bindSeg('modeSeg', 'mode', refreshDraftViews);
+  bindSeg('toneSeg', 'tone', () => {
+    if (unlockAudio()) master.gain.value = (draft.volume / 100) ** 1.6;
+    playTone(draft.tone);
   });
+  bindSeg('barSeg', 'barMode');
+
+  $('optVolume').addEventListener('input', e => {
+    draft.volume = +e.target.value;
+    if (master) master.gain.value = (draft.volume / 100) ** 1.6;
+  });
+  $('testBtn').addEventListener('click', () => {
+    unlockAudio();
+    if (master) master.gain.value = (draft.volume / 100) ** 1.6;
+    playTone(draft.tone);
+  });
+
+  // Colour swatches (preview live, revert on Cancel)
+  ACCENTS.forEach(([key, name, hex]) => {
+    const b = document.createElement('button');
+    b.className = 'swatch';
+    b.style.setProperty('--sw', hex);
+    b.dataset.v = key;
+    b.setAttribute('aria-label', `${name.toLowerCase()} glow`);
+    b.addEventListener('click', () => { draft.accent = key; applyAccent(key); syncSwatches(); });
+    $('swatches').appendChild(b);
+    $('swatchNames').appendChild(Object.assign(document.createElement('span'), { textContent: name }));
+  });
+  const syncSwatches = () => document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('sel', s.dataset.v === draft.accent));
+
+  const toggles = { optSound: 'sound', optTicks: 'ticks', optCues: 'cues', optVibrate: 'vibrate', optUrgency: 'urgency', optWake: 'wake' };
+  for (const [id, key] of Object.entries(toggles)) $(id).addEventListener('change', e => { draft[key] = e.target.checked; });
+
+  // Tabs
+  function selectTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('sel', t.dataset.tab === name));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('sel', p.dataset.pane === name));
+  }
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => selectTab(t.dataset.tab)));
 
   function openSettings() {
-    setInputs(settings.duration);
-    draftBarMode = settings.barMode;
-    optSound.checked = settings.sound;
-    optVibrate.checked = settings.vibrate;
-    optWake.checked = settings.wake;
-    markPreset();
-    markBarMode();
+    draft = JSON.parse(JSON.stringify(settings));
+    writeDuration(draft.duration);
+    $('restM').value = Math.floor(draft.rest / 60);
+    $('restS').value = draft.rest % 60;
+    $('optVolume').value = draft.volume;
+    for (const [id, key] of Object.entries(toggles)) $(id).checked = draft[key];
+    syncSeg('modeSeg', draft.mode);
+    syncSeg('toneSeg', draft.tone);
+    syncSeg('barSeg', draft.barMode);
+    syncSwatches();
+    refreshDraftViews();
     sheet.classList.add('open');
   }
-  function closeSettings() { sheet.classList.remove('open'); }
-
+  function closeSettings(save) {
+    if (!sheet.classList.contains('open')) return;
+    if (!save) {
+      applyAccent(settings.accent);
+      if (master) master.gain.value = (settings.volume / 100) ** 1.6;
+    }
+    sheet.classList.remove('open');
+    draft = null;
+  }
   function applySettings() {
-    const newDuration = inputSeconds();
-    const durationChanged = newDuration !== settings.duration;
-    settings.duration = newDuration;
-    settings.barMode = draftBarMode;
-    settings.sound = optSound.checked;
-    settings.vibrate = optVibrate.checked;
-    settings.wake = optWake.checked;
-    saveSettings();
-    closeSettings();
-    if (durationChanged) reset();      // a new time limit starts fresh
+    refreshDraftViews();
+    const timingChanged = ['mode', 'duration', 'rounds', 'rest'].some(k => draft[k] !== settings[k]);
+    settings = draft;
+    store.save(settings);
+    applyAccent(settings.accent);
+    closeSettings(true);
+    if (timingChanged) { reset(); toast('New timer ready'); }
     else {
-      if (!settings.wake) releaseWakeLock();
-      else if (running) requestWakeLock();
+      if (!settings.wake) releaseWakeLock(); else if (running) requestWakeLock();
+      if (master) master.gain.value = (settings.volume / 100) ** 1.6;
       render();
+      toast('Settings saved');
     }
   }
 
-  document.getElementById('settingsBtn').addEventListener('click', openSettings);
-  document.getElementById('cancelBtn').addEventListener('click', closeSettings);
-  document.getElementById('saveBtn').addEventListener('click', applySettings);
-  sheet.addEventListener('click', e => { if (e.target === sheet) closeSettings(); });
+  $('settingsBtn').addEventListener('click', openSettings);
+  $('cancelBtn').addEventListener('click', () => closeSettings(false));
+  $('saveBtn').addEventListener('click', applySettings);
+  sheet.addEventListener('click', e => { if (e.target === sheet) closeSettings(false); });
 
+  // ================= Main controls =================
   startBtn.addEventListener('click', start);
   stopBtn.addEventListener('click', stop);
-  document.getElementById('resetBtn').addEventListener('click', reset);
+  $('resetBtn').addEventListener('click', reset);
+  displayEl.addEventListener('click', () => { if (!running) openSettings(); });
+  nudgesEl.addEventListener('click', e => {
+    const b = e.target.closest('.nudge');
+    if (b) nudge(Number(b.dataset.d));
+  });
 
-  // ---------- Offline support ----------
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input')) { if (e.key === 'Enter') e.target.blur(); return; }
+    if (sheet.classList.contains('open')) { if (e.key === 'Escape') closeSettings(false); return; }
+    if (e.code === 'Space') { e.preventDefault(); if (finished) stop(); else toggle(); }
+    else if (e.key === 'r' || e.key === 'R') reset();
+    else if (e.key === 's' || e.key === 'S') openSettings();
+    else if (e.key === '+' || e.key === '=') nudge(60);
+    else if (e.key === '-') nudge(-60);
+  });
+
+  // ================= Offline support =================
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
+  resetState();
   render();
 })();
 </script>
