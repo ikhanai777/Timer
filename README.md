@@ -5,7 +5,26 @@ that shows progress. It's laid out for the Samsung Galaxy S25 Ultra's portrait s
 (about 412 × 915 CSS px) and scales to other phones.
 
 - `index.html`: version 2 (current)
+- `bloom.html`: Bloom variation (a flower grows instead of the bars)
 - `v1.html`: version 1, kept for reference
+
+## Bloom variation
+
+`bloom.html` has every version 2 feature, but a flower inside a glowing terrarium
+replaces the bar meter:
+
+1. **Roots** spread into the soil.
+2. A **sprout** breaks the surface, and the stem climbs with a glowing growth tip.
+3. **Leaves** open one by one up the stem.
+4. A **bud** forms at the top.
+5. The petals open into full **bloom** as the timer reaches zero. The flower then pulses and
+   releases pollen while the alarm rings.
+
+Stage labels beside the glass light up as each stage is reached. The glass turns amber
+near the end, red in the final seconds, and blue during rest rounds. In stopwatch mode, the
+flower takes one hour to reach full bloom. The Look tab adds a **flower colour** (pink,
+gold, violet, white, red or sky) on top of the glow colour. Bloom saves its settings
+separately, starting from your version 2 choices.
 
 ## Version 2
 
