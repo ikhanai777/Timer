@@ -1188,18 +1188,29 @@
     if (settings.vibrate) vibrate(ph.type === 'rest' ? [200] : [120, 80, 120]);
     lastTickSec = -1;
   }
-  function vibrate(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (_) {} }
+  // In the Android app, window.AndroidTimer is a native bridge for vibration and keep-screen-on.
+  const native = window.AndroidTimer || null;
+  function vibrate(p) {
+    try {
+      if (native) native.vibrate(JSON.stringify([].concat(p)));
+      else if (navigator.vibrate) navigator.vibrate(p);
+    } catch (_) {}
+  }
 
   // ================= Wake lock =================
   let wakeLock = null;
   async function requestWakeLock() {
+    if (native) { native.keepScreenOn(!!settings.wake); return; }
     if (!settings.wake || wakeLock || !('wakeLock' in navigator)) return;
     try {
       wakeLock = await navigator.wakeLock.request('screen');
       wakeLock.addEventListener('release', () => { wakeLock = null; });
     } catch (_) {}
   }
-  function releaseWakeLock() { if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } }
+  function releaseWakeLock() {
+    if (native) native.keepScreenOn(false);
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     if (running) { requestWakeLock(); loop(); } else render();
@@ -1398,6 +1409,12 @@
     refreshDraftViews();
     sheet.classList.add('open');
   }
+  // Android Back button: close the settings sheet if it is open.
+  window.protoTimerBack = () => {
+    if (!sheet.classList.contains('open')) return false;
+    closeSettings(false);
+    return true;
+  };
   function closeSettings(save) {
     if (!sheet.classList.contains('open')) return;
     if (!save) {

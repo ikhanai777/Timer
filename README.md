@@ -57,7 +57,36 @@ separately, starting from your version 2 choices.
 
 Settings are saved on the device. Choices you made in version 1 carry over.
 
-## Put it on your phone
+## Android app (APK)
+
+`android/dist/ProtoTimer.apk` is a ready-to-install Android app (about 150 KB, works fully
+offline). It adds two icons to your home screen: **Proto-Timer** (version 2) and
+**Timer Bloom**.
+
+To install it on the S25 Ultra:
+1. Copy the APK to the phone, or open this repo on the phone and download
+   `android/dist/ProtoTimer.apk`.
+2. Tap the file. If Android asks, allow your browser or file manager to
+   **Install unknown apps**.
+3. Tap **Install**. Play Protect may warn that the app is unrecognised because it isn't
+   from the Play Store. Choose **More details → Install anyway**.
+
+In the app:
+- **Keep screen on** holds the screen awake while a timer runs, and vibration uses the
+  phone's motor.
+- **Back** closes the settings sheet. Otherwise it moves the app to the background without
+  stopping the timer.
+- The alarm plays at **media volume**. Keep the app open while a timer runs, because
+  Android can delay the alarm if the app has been in the background for a long time.
+
+To rebuild it after changing `index.html` or `bloom.html`, run `android/build.sh`. The
+script lists the Ubuntu packages it needs. The app wraps the same pages in a WebView. The
+fonts (Chakra Petch and Share Tech Mono, SIL Open Font License) are bundled in
+`android/assets/fonts`.
+`android/prototimer.keystore` is the app's signing key. Keep it, because updates only
+install over the existing app when they're signed with the same key.
+
+## Put it on your phone as a web app
 
 1. Host the folder on any HTTPS static host. For GitHub Pages: repo **Settings → Pages →
    Deploy from branch**, then pick this branch and `/ (root)`.
