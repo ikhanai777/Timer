@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f1a12">
+<title>Pomodoro Garden</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Figtree:wght@400;500;600&display=swap">
+<style>
+  /* One deliberate look: a daylit 3D garden behind smoky glass controls. */
+  :root {
+    color-scheme: dark;
+    --ink: #f3f6ec;
+    --muted: rgba(243, 246, 236, 0.68);
+    --faint: rgba(243, 246, 236, 0.16);
+    --glass: rgba(14, 24, 16, 0.46);
+    --glass-strong: rgba(12, 20, 14, 0.82);
+    --line: rgba(255, 255, 255, 0.14);
+    --tomato: #e4573d;
+    --leaf: #8bd17c;
+    --dusk: #a89bf2;
+    --accent: var(--tomato);
+    --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+    --ui: "Figtree", "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  :root[data-phase="short"] { --accent: var(--leaf); }
+  :root[data-phase="long"] { --accent: var(--dusk); }
+
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #0f1a12; color: var(--ink); font-family: var(--ui); }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #scene:active { cursor: grabbing; }
+
+  .top {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    pointer-events: none;
+  }
+  .brand {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
+    font-variation-settings: "opsz" 72;
+  }
+  .brand em { font-style: italic; font-weight: 300; }
+  .top-actions { display: flex; gap: 8px; pointer-events: auto; }
+
+  .icon {
+    width: 42px; height: 42px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--glass);
+    backdrop-filter: blur(14px) saturate(1.3);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .icon:active { transform: scale(0.94); }
+  .icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .icon[aria-pressed="true"] { background: rgba(255, 255, 255, 0.2); }
+
+  .panel {
+    position: fixed;
+    left: 16px; right: 16px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    padding: 16px 18px 14px;
+    border-radius: 26px;
+    background: var(--glass);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(20px) saturate(1.35);
+    -webkit-backdrop-filter: blur(20px) saturate(1.35);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    display: grid;
+    gap: 10px;
+  }
+  @media (min-width: 900px) {
+    .panel { right: auto; width: 380px; left: 28px; bottom: 28px; }
+    .top { padding: 22px 28px; }
+  }
+
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: rgba(0, 0, 0, 0.22); }
+  .tab {
+    border: 0; background: none; padding: 8px 4px; border-radius: 10px;
+    font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer;
+    transition: background 0.25s, color 0.25s;
+  }
+  .tab.sel { background: rgba(255, 255, 255, 0.14); color: var(--ink); }
+  .tab .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .tab[data-phase="focus"] .dot { background: var(--tomato); }
+  .tab[data-phase="short"] .dot { background: var(--leaf); }
+  .tab[data-phase="long"] .dot { background: var(--dusk); }
+
+  .clock {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: clamp(64px, 19vw, 92px);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-variation-settings: "opsz" 144;
+    text-align: center;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.25);
+  }
+  .stage { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--muted); }
+  .stage b { color: var(--ink); font-weight: 500; }
+  .bar { height: 4px; border-radius: 2px; background: var(--faint); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: background 0.4s; }
+
+  .controls { display: grid; grid-template-columns: 48px 1fr 48px; gap: 12px; align-items: center; margin-top: 4px; }
+  .controls .icon { width: 48px; height: 48px; background: rgba(255, 255, 255, 0.08); backdrop-filter: none; }
+  .primary {
+    height: 52px;
+    border: 0;
+    border-radius: 26px;
+    background: var(--accent);
+    color: #1a0f0b;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 45%, transparent);
+    transition: background 0.4s, transform 0.1s;
+  }
+  .primary:active { transform: scale(0.98); }
+
+  .meta { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; color: var(--muted); }
+  .rounds { display: flex; gap: 6px; align-items: center; }
+  .rounds span { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--muted); }
+  .rounds span.done { background: var(--tomato); border-color: var(--tomato); }
+  .rounds span.now { border-color: var(--ink); }
+  .stats { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .tip {
+    position: fixed;
+    left: 50%;
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
+    transform: translateX(-50%);
+    padding: 10px 16px;
+    border-radius: 16px;
+    background: var(--glass-strong);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    text-align: center;
+    pointer-events: none;
+    max-width: calc(100% - 32px);
+  }
+  .tip b { font-family: var(--display); font-weight: 500; font-size: 17px; display: block; margin-bottom: 2px; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    top: calc(env(safe-area-inset-top, 0px) + 70px);
+    transform: translate(-50%, -10px);
+    padding: 10px 18px;
+    border-radius: 20px;
+    background: var(--glass-strong);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .sheet-wrap { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: flex-end; justify-content: center; }
+  @media (min-width: 900px) { .sheet-wrap { align-items: center; } }
+  .sheet {
+    width: 100%;
+    max-width: 440px;
+    max-height: 88%;
+    overflow-y: auto;
+    padding: 20px 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    border-radius: 26px 26px 0 0;
+    background: var(--glass-strong);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  @media (min-width: 900px) { .sheet { border-radius: 26px; } }
+  .sheet h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0 0 6px; font-variation-settings: "opsz" 72; }
+  .sheet .lede { color: var(--muted); font-size: 14px; margin: 0 0 12px; line-height: 1.45; }
+  .group-title { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 18px 0 4px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-size: 15px; }
+  .row small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .stepper { display: flex; align-items: center; gap: 6px; }
+  .stepper button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); cursor: pointer; font-size: 18px; line-height: 1; }
+  .stepper output { min-width: 58px; text-align: center; font-variant-numeric: tabular-nums; }
+  .switch { position: relative; width: 48px; height: 28px; flex: 0 0 auto; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .switch i { position: absolute; inset: 0; border-radius: 14px; background: rgba(255, 255, 255, 0.16); transition: background 0.2s; pointer-events: none; }
+  .switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+  .switch input:checked + i { background: var(--accent); }
+  .switch input:checked + i::after { transform: translateX(20px); }
+  .switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type="range"] { width: 140px; accent-color: var(--accent); }
+  .wide-btn {
+    width: 100%; height: 46px; margin-top: 10px;
+    border-radius: 14px; border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.08);
+    cursor: pointer; font-size: 15px;
+  }
+  .wide-btn.danger { color: #ffb4a6; }
+  .confirm { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .confirm p { grid-column: 1 / -1; margin: 0; font-size: 14px; color: var(--muted); }
+  .confirm button { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); cursor: pointer; }
+  .confirm .yes { background: #c9432d; border-color: #c9432d; }
+  .done-btn { width: 100%; height: 50px; margin-top: 18px; border: 0; border-radius: 16px; background: var(--accent); color: #1a0f0b; font-weight: 600; font-size: 16px; cursor: pointer; }
+
+  .loading { position: fixed; inset: 0; display: grid; place-items: center; font-family: var(--display); font-size: 20px; color: var(--muted); pointer-events: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; }
+  }
+</style>
+
+</head>
+<body>
+<canvas id="scene" aria-label="A 3D garden. A flower grows in the centre bed while you focus."></canvas>
+<div class="loading" id="loading">Planting the garden…</div>
+
+<header class="top">
+  <div class="brand">Pomodoro <em>Garden</em></div>
+  <div class="top-actions">
+    <button class="icon" id="ambBtn" aria-pressed="false" aria-label="Garden sounds" title="Garden sounds">
+      <svg viewBox="0 0 24 24"><path d="M4 10v4h3l5 4V6L7 10H4z"/><path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"/></svg>
+    </button>
+    <button class="icon" id="setBtn" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="tip" id="tip" hidden></div>
+<div class="toast" id="toast" role="status"></div>
+
+<section class="panel" id="panel" aria-label="Timer">
+  <div class="tabs" role="tablist">
+    <button class="tab" data-phase="focus" role="tab"><span class="dot"></span>Focus</button>
+    <button class="tab" data-phase="short" role="tab"><span class="dot"></span>Short break</button>
+    <button class="tab" data-phase="long" role="tab"><span class="dot"></span>Long break</button>
+  </div>
+  <div class="clock" id="clock" role="timer">25:00</div>
+  <div class="stage"><span id="stage"><b>Seed</b> · ready to sprout</span><span id="pct">0%</span></div>
+  <div class="bar"><i id="barFill"></i></div>
+  <div class="controls">
+    <button class="icon" id="resetBtn" aria-label="Restart this phase" title="Restart this phase">
+      <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg>
+    </button>
+    <button class="primary" id="mainBtn">Start focus</button>
+    <button class="icon" id="skipBtn" aria-label="Skip to next phase" title="Skip to next phase">
+      <svg viewBox="0 0 24 24"><path d="M5 5l9 7-9 7V5zM18 5v14"/></svg>
+    </button>
+  </div>
+  <div class="meta">
+    <div class="rounds" id="rounds" aria-label="Focus sessions this cycle"></div>
+    <div class="stats" id="stats">Today: 0 flowers · 0 min</div>
+  </div>
+</section>
+
+<div class="sheet-wrap" id="sheetWrap" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <h2 id="sheetTitle">Garden settings</h2>
+    <p class="lede">Each focus session grows one flower. When it blooms, it's planted in the bed, and your garden fills up as you work.</p>
+
+    <div class="group-title">Durations</div>
+    <div class="row"><span>Focus</span><div class="stepper" data-key="focus" data-min="1" data-max="90"><button aria-label="Shorter focus">−</button><output id="out-focus"></output><button aria-label="Longer focus">+</button></div></div>
+    <div class="row"><span>Short break</span><div class="stepper" data-key="short" data-min="1" data-max="30"><button aria-label="Shorter short break">−</button><output id="out-short"></output><button aria-label="Longer short break">+</button></div></div>
+    <div class="row"><span>Long break</span><div class="stepper" data-key="long" data-min="5" data-max="60"><button aria-label="Shorter long break">−</button><output id="out-long"></output><button aria-label="Longer long break">+</button></div></div>
+    <div class="row"><span>Long break after<small>Focus sessions per cycle</small></span><div class="stepper" data-key="rounds" data-min="2" data-max="8"><button aria-label="Fewer sessions">−</button><output id="out-rounds"></output><button aria-label="More sessions">+</button></div></div>
+
+    <div class="group-title">Flow</div>
+    <label class="row"><span>Start breaks automatically</span><span class="switch"><input type="checkbox" id="autoBreak"><i></i></span></label>
+    <label class="row"><span>Start focus automatically</span><span class="switch"><input type="checkbox" id="autoFocus"><i></i></span></label>
+
+    <div class="group-title">Sound</div>
+    <div class="row"><span>Chime volume</span><input type="range" id="volume" min="0" max="100" step="5" aria-label="Chime volume"></div>
+    <label class="row"><span>Garden sounds<small>Soft wind and birdsong</small></span><span class="switch"><input type="checkbox" id="ambience"><i></i></span></label>
+
+    <div class="group-title">Garden</div>
+    <button class="wide-btn" id="lapseBtn">Watch a flower grow (10 s time-lapse)</button>
+    <button class="wide-btn danger" id="clearBtn">Clear the garden</button>
+    <div class="confirm" id="confirm" hidden>
+      <p id="confirmText">Remove all planted flowers? This can't be undone.</p>
+      <button id="noBtn">Keep them</button>
+      <button class="yes" id="yesBtn">Clear garden</button>
+    </div>
+
+    <button class="done-btn" id="doneBtn">Done</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  // In the Android app, window.AndroidGarden is a native bridge (alarm notifications,
+  // vibration, keep-screen-on). In a browser it is absent and web APIs are used instead.
+  const native = window.AndroidGarden || null;
+  const vibrate = p => { try { native ? native.vibrate(JSON.stringify(p)) : navigator.vibrate && navigator.vibrate(p); } catch (_) {} };
+
+  // =====================================================================
+  // Storage
+  // =====================================================================
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (_) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
+  };
+  const settings = Object.assign(
+    { focus: 25, short: 5, long: 15, rounds: 4, autoBreak: true, autoFocus: false, volume: 70, ambience: false },
+    store.get('pg-settings', {}));
+  let garden = store.get('pg-garden', []);           // [{type, pal, seed, t, min}]
+  if (!Array.isArray(garden)) garden = [];
+
+  // =====================================================================
+  // Helpers
+  // =====================================================================
+  const TAU = Math.PI * 2;
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const seg = (p, a, b) => clamp01((p - a) / (b - a));
+  const ease = t => t * t * (3 - 2 * t);
+  const easeOutBack = t => { const c = 1.6; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const lin = hex => new THREE.Color(hex).convertSRGBToLinear();
+  const isSmall = Math.min(innerWidth, innerHeight) < 700;
+
+  if (!window.THREE) { $('loading').textContent = 'The 3D engine could not load. Check your connection and reload.'; return; }
+
+  // =====================================================================
+  // Renderer, scene, camera
+  // =====================================================================
+  const canvas = $('scene');
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  } catch (e) {
+    $('loading').textContent = 'This device could not start 3D graphics.';
+    return;
+  }
+  renderer.setPixelRatio(Math.min(devicePixelRatio, isSmall ? 2 : 1.75));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(lin('#d7eaf3'), 20, 75);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 300);
+
+  // ---- Sky dome -------------------------------------------------------
+  const skyUniforms = {
+    top: { value: new THREE.Color('#4f8fd6') },
+    horizon: { value: new THREE.Color('#d7eaf3') },
+    bottom: { value: new THREE.Color('#9fbf88') },
+    sunDir: { value: new THREE.Vector3(0, 1, 0) },
+    sunColor: { value: new THREE.Color('#fff4df') },
+    sunSize: { value: 1 },
+  };
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(140, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyUniforms,
+      vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `
+        uniform vec3 top, horizon, bottom, sunColor, sunDir; uniform float sunSize; varying vec3 vDir;
+        void main(){
+          vec3 d = normalize(vDir);
+          float h = d.y;
+          vec3 c = h > 0.0 ? mix(horizon, top, pow(h, 0.55)) : mix(horizon, bottom, pow(-h, 0.4));
+          float s = max(dot(d, normalize(sunDir)), 0.0);
+          c += sunColor * (pow(s, 900.0) * 3.0 * sunSize + pow(s, 12.0) * 0.28 + pow(s, 3.0) * 0.08);
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+    }));
+  scene.add(sky);
+
+  // ---- Lights ---------------------------------------------------------
+  const hemi = new THREE.HemisphereLight(0xdcecff, 0x557a3a, 0.75);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff4df, 1.25);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(isSmall ? 1024 : 2048, isSmall ? 1024 : 2048);
+  Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 80 });
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.02;
+  scene.add(sun, sun.target);
+
+  // =====================================================================
+  // Terrain
+  // =====================================================================
+  const groundHeight = (x, z) => {
+    const r = Math.hypot(x, z);
+    const hill = Math.pow(seg(r, 20, 60), 1.6) * 9;
+    const n = Math.sin(x * 0.11) * Math.cos(z * 0.13) * 1.4 + Math.sin(x * 0.047 + z * 0.06) * 2.2;
+    return hill * (0.75 + 0.25 * n) + (r > 18 ? n * 0.25 * seg(r, 18, 30) : 0);
+  };
+  {
+    const g = new THREE.RingGeometry(0, 95, 128, 60);
+    g.rotateX(-Math.PI / 2);
+    const pos = g.attributes.position;
+    const cols = new Float32Array(pos.count * 3);
+    const c1 = lin('#3f6a28'), c2 = lin('#56823a'), c3 = lin('#7a9650'), tmp = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      pos.setY(i, groundHeight(x, z));
+      const n = 0.5 + 0.5 * Math.sin(x * 0.35 + Math.cos(z * 0.3) * 2) * Math.cos(z * 0.27);
+      tmp.copy(c1).lerp(c2, n).lerp(c3, seg(Math.hypot(x, z), 25, 70) * 0.6);
+      cols.set([tmp.r, tmp.g, tmp.b], i * 3);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    g.computeVertexNormals();
+    const ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    ground.receiveShadow = true;
+    scene.add(ground);
+  }
+
+  // ---- Garden bed: soil and a ring of stones --------------------------
+  const SOIL_Y = 0.14;
+  {
+    const g = new THREE.CylinderGeometry(5.15, 5.35, 0.3, 72, 1);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      if (pos.getY(i) > 0) {
+        const x = pos.getX(i), z = pos.getZ(i);
+        pos.setY(i, 0.15 + Math.sin(x * 3.1) * Math.cos(z * 2.7) * 0.012);
+      }
+    }
+    g.computeVertexNormals();
+    const soil = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: lin('#4a3122'), roughness: 1 }));
+    soil.position.y = -0.01;
+    soil.receiveShadow = true;
+    scene.add(soil);
+
+    // Soil clods
+    const clodGeo = new THREE.IcosahedronGeometry(0.05, 0);
+    const clods = new THREE.InstancedMesh(clodGeo, new THREE.MeshStandardMaterial({ color: lin('#3c2719'), roughness: 1, flatShading: true }), 260);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
+    const r = rng(11);
+    for (let i = 0; i < 260; i++) {
+      const a = r() * TAU, rr = Math.sqrt(r()) * 5;
+      p.set(Math.cos(a) * rr, SOIL_Y - 0.01, Math.sin(a) * rr);
+      e.set(r() * 3, r() * 3, r() * 3); q.setFromEuler(e);
+      const k = 0.5 + r() * 1.2; s.set(k, k * 0.6, k);
+      clods.setMatrixAt(i, m.compose(p, q, s));
+    }
+    clods.receiveShadow = true;
+    scene.add(clods);
+
+    const stoneGeo = new THREE.DodecahedronGeometry(0.3, 1);
+    const sp = stoneGeo.attributes.position;
+    for (let i = 0; i < sp.count; i++) {
+      const v = new THREE.Vector3().fromBufferAttribute(sp, i);
+      v.multiplyScalar(1 + (Math.sin(v.x * 17) * Math.cos(v.y * 13) * Math.sin(v.z * 11)) * 0.12);
+      sp.setXYZ(i, v.x, v.y, v.z);
+    }
+    stoneGeo.computeVertexNormals();
+    const N = 46;
+    const stones = new THREE.InstancedMesh(stoneGeo, new THREE.MeshStandardMaterial({ roughness: 0.92, flatShading: false }), N);
+    const col = new THREE.Color();
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * TAU + r() * 0.05;
+      p.set(Math.cos(a) * 5.45, 0.1, Math.sin(a) * 5.45);
+      e.set(r() * 0.4, r() * TAU, r() * 0.4); q.setFromEuler(e);
+      s.set(0.95 + r() * 0.5, 0.55 + r() * 0.35, 0.8 + r() * 0.4);
+      stones.setMatrixAt(i, m.compose(p, q, s));
+      stones.setColorAt(i, col.copy(lin('#8f8b82')).offsetHSL(0, 0, (r() - 0.5) * 0.12));
+    }
+    stones.castShadow = true; stones.receiveShadow = true;
+    scene.add(stones);
+  }
+
+  // ---- Grass (instanced blades, wind in the vertex shader) -------------
+  const windUniform = { value: 0 };
+  {
+    const blade = new THREE.PlaneGeometry(0.07, 0.5, 1, 5);
+    blade.translate(0, 0.25, 0);
+    const bp = blade.attributes.position;
+    for (let i = 0; i < bp.count; i++) {
+      const y = bp.getY(i), t = y / 0.5;
+      bp.setX(i, bp.getX(i) * (1 - t * 0.92));
+      bp.setZ(i, t * t * 0.08);
+    }
+    blade.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ roughness: 0.85, side: THREE.DoubleSide });
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.uTime = windUniform;
+      sh.vertexShader = 'uniform float uTime;\nvarying float vH;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+        vec4 mvPosition = vec4( transformed, 1.0 );
+        #ifdef USE_INSTANCING
+          mvPosition = instanceMatrix * mvPosition;
+        #endif
+        float h = clamp(position.y / 0.5, 0.0, 1.0);
+        vH = h;
+        float wv = sin(uTime * 1.6 + mvPosition.x * 0.32 + mvPosition.z * 0.21) * 0.65 + sin(uTime * 3.3 + mvPosition.x * 1.3 + mvPosition.z) * 0.22;
+        mvPosition.x += wv * h * h * 0.2;
+        mvPosition.z += wv * h * h * 0.09;
+        mvPosition = modelViewMatrix * mvPosition;
+        gl_Position = projectionMatrix * mvPosition;`);
+      sh.fragmentShader = 'varying float vH;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb *= mix(0.32, 1.08, vH);');
+    };
+    const COUNT = isSmall ? 5200 : 11000;
+    const grass = new THREE.InstancedMesh(blade, mat, COUNT);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
+    const r = rng(3), col = new THREE.Color();
+    const greens = ['#4f8a30', '#669d3c', '#3f7428', '#7aa84a', '#5a8f34'].map(lin);
+    for (let i = 0; i < COUNT; i++) {
+      const a = r() * TAU;
+      const rr = 5.95 + Math.pow(r(), 0.8) * 13;
+      p.set(Math.cos(a) * rr, groundHeight(Math.cos(a) * rr, Math.sin(a) * rr) - 0.02, Math.sin(a) * rr);
+      e.set((r() - 0.5) * 0.25, r() * TAU, (r() - 0.5) * 0.25); q.setFromEuler(e);
+      const h = 0.55 + r() * 0.9 + (rr > 12 ? 0.3 : 0);
+      s.set(0.8 + r() * 0.6, h, 1);
+      grass.setMatrixAt(i, m.compose(p, q, s));
+      grass.setColorAt(i, col.copy(greens[(r() * greens.length) | 0]).multiplyScalar(0.85 + r() * 0.3));
+    }
+    grass.receiveShadow = true;
+    scene.add(grass);
+  }
+
+  // ---- Trees on the meadow edge ---------------------------------------
+  {
+    const r = rng(21);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: lin('#5a4030'), roughness: 1 });
+    const leafMats = ['#3f6d2b', '#4b7a31', '#355f26'].map(c => new THREE.MeshStandardMaterial({ color: lin(c), roughness: 0.95 }));
+    const blob = new THREE.SphereGeometry(1, 18, 14);
+    const bp = blob.attributes.position;
+    for (let i = 0; i < bp.count; i++) {
+      const v = new THREE.Vector3().fromBufferAttribute(bp, i);
+      v.multiplyScalar(1 + Math.sin(v.x * 5.1) * Math.cos(v.y * 4.3) * Math.sin(v.z * 3.7) * 0.18);
+      bp.setXYZ(i, v.x, v.y, v.z);
+    }
+    blob.computeVertexNormals();
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * TAU + r() * 0.35;
+      const rr = 24 + r() * 12;
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr, y = groundHeight(x, z);
+      const tree = new THREE.Group();
+      const hgt = 3 + r() * 2.5;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.32, hgt, 8), trunkMat);
+      trunk.position.y = hgt / 2;
+      tree.add(trunk);
+      const n = 4 + ((r() * 3) | 0);
+      for (let k = 0; k < n; k++) {
+        const b = new THREE.Mesh(blob, leafMats[(r() * 3) | 0]);
+        const sc = 1.3 + r() * 1.2;
+        b.scale.set(sc, sc * (0.8 + r() * 0.3), sc);
+        b.position.set((r() - 0.5) * 2.2, hgt + (r() - 0.2) * 1.8, (r() - 0.5) * 2.2);
+        tree.add(b);
+      }
+      tree.position.set(x, y - 0.1, z);
+      tree.scale.setScalar(0.9 + r() * 0.6);
+      scene.add(tree);
+    }
+  }
+
+  // =====================================================================
+  // Flowers
+  // =====================================================================
+  const TYPES = {
+    daisy:     { name: 'Daisy', n: 21, len: 0.42, width: 0.085, cup: 0.12, curl: -0.03, open: 1.42, center: 0.13, flat: 0.5, height: [1.0, 1.35],
+                 pals: [['#efe8cf', '#ffffff', '#f2b01e']] },
+    cosmos:    { name: 'Cosmos', n: 8, len: 0.5, width: 0.27, cup: 0.25, curl: 0.02, open: 1.28, center: 0.085, flat: 0.7, height: [1.1, 1.5],
+                 pals: [['#c93d86', '#f36fb3', '#f4c430'], ['#f2c9dc', '#ffffff', '#f4c430'], ['#8e2aa8', '#c24fd8', '#f0c02e']] },
+    poppy:     { name: 'Poppy', n: 5, len: 0.5, width: 0.52, cup: 0.6, curl: 0.18, open: 1.02, center: 0.08, flat: 0.8, height: [0.95, 1.3],
+                 pals: [['#a8150c', '#ec3a1f', '#1f1814'], ['#d8650b', '#f8a51c', '#2a1d10'], ['#e9e3d8', '#ffffff', '#23201c']] },
+    tulip:     { name: 'Tulip', n: 6, len: 0.56, width: 0.36, cup: 0.85, curl: 0.18, open: 0.34, center: 0.05, flat: 1, height: [1.0, 1.3],
+                 pals: [['#a61d18', '#ea4431', '#e2d15a'], ['#d99a13', '#f6d33c', '#e2d15a'], ['#c44a7d', '#f59ac0', '#e2d15a'], ['#3d1a61', '#7a3fb0', '#e2d15a']] },
+    sunflower: { name: 'Sunflower', n: 26, len: 0.5, width: 0.13, cup: 0.18, curl: -0.04, open: 1.5, center: 0.24, flat: 0.42, height: [1.5, 1.9],
+                 pals: [['#e38a09', '#f7c21b', '#4b2b12']] },
+  };
+  const TYPE_KEYS = Object.keys(TYPES);
+
+  const plantMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0, side: THREE.DoubleSide });
+
+  function colorize(geo, fn) {
+    const pos = geo.attributes.position;
+    const arr = new Float32Array(pos.count * 3);
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) { fn(c, i, pos); arr.set([c.r, c.g, c.b], i * 3); }
+    geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+    return geo;
+  }
+
+  function petalGeo(T, pal) {
+    const g = new THREE.PlaneGeometry(1, 1, 6, 10);
+    const pos = g.attributes.position;
+    const base = lin(pal[0]), tip = lin(pal[1]);
+    for (let i = 0; i < pos.count; i++) {
+      const u = pos.getX(i) + 0.5, v = pos.getY(i) + 0.5;
+      const w = T.width * Math.sin(Math.PI * Math.min(1, Math.pow(v, 0.72) * 0.97 + 0.03));
+      const x = (u - 0.5) * w;
+      const y = v * T.len;
+      const across = w > 0 ? (x / (T.width * 0.5)) : 0;
+      const z = -T.cup * across * across * T.len * 0.35 - T.curl * v * v * T.len;
+      pos.setXYZ(i, x, y, z);
+    }
+    g.computeVertexNormals();
+    return colorize(g, (c, i, p) => {
+      const v = p.getY(i) / T.len;
+      c.copy(base).lerp(tip, Math.pow(clamp01(v * 1.35), 0.8));
+    });
+  }
+
+  function leafGeo(len, width) {
+    const g = new THREE.PlaneGeometry(1, 1, 4, 8);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const u = pos.getX(i) + 0.5, v = pos.getY(i) + 0.5;
+      const w = width * Math.sin(Math.PI * Math.pow(v, 0.85));
+      const x = (u - 0.5) * w;
+      pos.setXYZ(i, x, v * len, -Math.abs(x) * 0.5 + v * v * len * 0.28);
+    }
+    g.computeVertexNormals();
+    const a = lin('#2f6b24'), b = lin('#6fae45');
+    return colorize(g, (c, i, p) => c.copy(a).lerp(b, clamp01(p.getY(i) / len + Math.abs(p.getX(i)) * 2)));
+  }
+  const LEAF = leafGeo(0.42, 0.17);
+
+  // Builds a flower as a small hierarchy; setGrowth(p) animates seed -> bloom.
+  function buildFlower(spec) {
+    const T = TYPES[spec.type];
+    const pal = T.pals[spec.pal % T.pals.length];
+    const r = rng(spec.seed);
+    const root = new THREE.Group();
+    const H = lerp(T.height[0], T.height[1], r());
+
+    const pts = [new THREE.Vector3(0, 0, 0)];
+    for (let k = 1; k <= 4; k++) {
+      const t = k / 4;
+      pts.push(new THREE.Vector3((r() - 0.5) * 0.14 * t, H * t, (r() - 0.5) * 0.14 * t));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    const TUB = 40, RAD = 7;
+    const stemGeo = new THREE.TubeGeometry(curve, TUB, spec.type === 'sunflower' ? 0.04 : 0.028, RAD, false);
+    const sA = lin('#3b6e28'), sB = lin('#63a040');
+    colorize(stemGeo, (c, i) => c.copy(sA).lerp(sB, stemGeo.attributes.uv.getX(i)));
+    const stem = new THREE.Mesh(stemGeo, plantMat);
+    stem.castShadow = true;
+    root.add(stem);
+
+    const leaves = [];
+    const nLeaves = 2 + ((r() * 2.5) | 0);
+    for (let k = 0; k < nLeaves; k++) {
+      const t = 0.12 + (k / nLeaves) * 0.5 + r() * 0.06;
+      const pivot = new THREE.Group();
+      pivot.position.copy(curve.getPointAt(t));
+      pivot.rotation.y = k * 2.3 + r();
+      const leaf = new THREE.Mesh(LEAF, plantMat);
+      leaf.rotation.x = 0.85 + r() * 0.3;
+      const ls = 0.8 + r() * 0.5 - t * 0.3;
+      leaf.scale.setScalar(ls);
+      leaf.castShadow = true;
+      pivot.add(leaf);
+      root.add(pivot);
+      leaves.push({ pivot, t });
+    }
+
+    const head = new THREE.Group();
+    head.position.copy(curve.getPointAt(1));
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), curve.getTangentAt(1).normalize());
+    head.rotateX(-0.12 - r() * 0.2);
+    root.add(head);
+
+    const sepalGeo = colorize(new THREE.ConeGeometry(0.07, 0.1, 10, 1, true), c => c.copy(sA));
+    const sepal = new THREE.Mesh(sepalGeo, plantMat);
+    sepal.rotation.x = Math.PI; sepal.position.y = -0.02;
+    head.add(sepal);
+
+    const pg = petalGeo(T, pal);
+    const petals = [];
+    for (let i = 0; i < T.n; i++) {
+      const pivot = new THREE.Group();
+      pivot.rotation.y = (i / T.n) * TAU + (r() - 0.5) * 0.12 + (i % 2) * 0.08;
+      const pet = new THREE.Mesh(pg, plantMat);
+      pet.castShadow = true;
+      const jitter = (r() - 0.5) * 0.12;
+      pivot.add(pet);
+      head.add(pivot);
+      petals.push({ pivot, pet, jitter, layer: i % 2 });
+    }
+
+    const cg = colorize(new THREE.SphereGeometry(T.center, 20, 12), (c, i, p) => {
+      const y = p.getY(i) / T.center;
+      c.copy(lin(pal[2])).multiplyScalar(0.6 + 0.5 * clamp01(y));
+    });
+    const center = new THREE.Mesh(cg, plantMat);
+    center.scale.y = T.flat;
+    center.position.y = 0.02;
+    center.castShadow = true;
+    head.add(center);
+
+    function setGrowth(p) {
+      const s = ease(seg(p, 0.02, 0.62));
+      stemGeo.setDrawRange(0, Math.max(0, Math.floor(s * TUB)) * RAD * 6);
+      stem.visible = s > 0;
+      leaves.forEach(l => {
+        const k = easeOutBack(seg(s, l.t + 0.02, l.t + 0.22));
+        l.pivot.scale.setScalar(Math.max(0.0001, k));
+        l.pivot.visible = k > 0.001;
+      });
+      const bud = ease(seg(p, 0.58, 0.74));
+      const open = ease(seg(p, 0.76, 0.98));
+      head.visible = bud > 0.001;
+      head.position.copy(curve.getPointAt(Math.max(0.001, s)));
+      head.scale.setScalar(Math.max(0.0001, bud));
+      petals.forEach(pt => {
+        const target = T.open + pt.jitter - (pt.layer ? 0.1 : 0);
+        pt.pet.rotation.x = lerp(0.1, target, open);
+        const sc = lerp(0.55, 1, open);
+        pt.pet.scale.set(lerp(0.7, 1, open) * sc, sc, sc);
+      });
+      center.scale.set(lerp(0.4, 1, open), T.flat * lerp(0.4, 1, open), lerp(0.4, 1, open));
+      center.visible = open > 0.05 || spec.type === 'tulip';
+    }
+
+    const headWorld = new THREE.Vector3();
+    return { root, setGrowth, head, spec, T, curve, headWorld };
+  }
+
+  // Bake a fully grown flower into one mesh (one draw call per flower).
+  function bakeFlower(spec, scale) {
+    const f = buildFlower(spec);
+    f.setGrowth(1);
+    f.root.updateMatrixWorld(true);
+    const parts = [];
+    f.root.traverse(o => {
+      if (!o.isMesh || !o.visible) return;
+      let g = o.geometry.clone();
+      g.deleteAttribute('uv');
+      g.applyMatrix4(o.matrixWorld);
+      parts.push(g);
+    });
+    let nv = 0, ni = 0;
+    parts.forEach(g => { nv += g.attributes.position.count; ni += g.index.count; });
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), idx = new Uint32Array(ni);
+    let vo = 0, io = 0;
+    parts.forEach(g => {
+      const n = g.attributes.position.count;
+      pos.set(g.attributes.position.array, vo * 3);
+      nor.set(g.attributes.normal.array, vo * 3);
+      col.set(g.attributes.color.array, vo * 3);
+      const ia = g.index.array;
+      for (let i = 0; i < ia.length; i++) idx[io + i] = ia[i] + vo;
+      vo += n; io += ia.length;
+      g.dispose();
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    const mesh = new THREE.Mesh(geo, plantMat);
+    mesh.castShadow = true;
+    mesh.scale.setScalar(scale);
+    f.head.getWorldPosition(f.headWorld);
+    mesh.userData.headLocal = f.headWorld.clone();
+    return mesh;
+  }
+
+  // ---- Ambient wildflowers in the meadow ------------------------------
+  const swayers = [];   // {obj, ph, amp}
+  const landingSpots = [];   // Vector3 world positions of flower heads
+  {
+    const r = rng(77);
+    for (let i = 0; i < (isSmall ? 34 : 60); i++) {
+      const a = r() * TAU, rr = 6.6 + Math.pow(r(), 0.7) * 10;
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+      const type = ['daisy', 'daisy', 'cosmos', 'poppy'][(r() * 4) | 0];
+      const mesh = bakeFlower({ type, pal: (r() * 3) | 0, seed: 1000 + i }, 0.42 + r() * 0.18);
+      mesh.position.set(x, groundHeight(x, z), z);
+      mesh.rotation.y = r() * TAU;
+      scene.add(mesh);
+      swayers.push({ obj: mesh, ph: r() * TAU, amp: 0.05 });
+    }
+  }
+
+  // ---- Planted flowers (your finished focus sessions) ------------------
+  const planted = [];   // {mesh, entry, grow}
+  const plantSpot = k => {
+    const ring = k % 90;
+    const a = k * 2.39996 + 0.4;
+    const rr = 1.7 + 3.1 * Math.sqrt((ring + 0.5) / 90);
+    return new THREE.Vector3(Math.cos(a) * rr, SOIL_Y, Math.sin(a) * rr);
+  };
+  function addPlanted(entry, k, animate) {
+    const mesh = bakeFlower(entry, 0.85);
+    const p = plantSpot(k);
+    mesh.position.copy(p);
+    mesh.rotation.y = rng(entry.seed + 5)() * TAU;
+    mesh.userData.entry = entry;
+    scene.add(mesh);
+    const item = { mesh, entry, grow: animate ? 0 : 1, ph: Math.random() * TAU };
+    if (animate) mesh.scale.setScalar(0.0001);
+    planted.push(item);
+    return item;
+  }
+  function rebuildGarden() {
+    planted.splice(0).forEach(p => { scene.remove(p.mesh); p.mesh.geometry.dispose(); });
+    garden.forEach((e, k) => addPlanted(e, k, false));
+  }
+  rebuildGarden();
+
+  // ---- The hero flower growing in the centre --------------------------
+  function newSpec() {
+    const r = Math.random;
+    const type = TYPE_KEYS[(r() * TYPE_KEYS.length) | 0];
+    return { type, pal: (r() * TYPES[type].pals.length) | 0, seed: (r() * 1e9) | 0 };
+  }
+  let heroSpec = store.get('pg-hero', null) || newSpec();
+  store.set('pg-hero', heroSpec);
+  let hero = null;
+  const heroMound = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 12), new THREE.MeshStandardMaterial({ color: lin('#563826'), roughness: 1 }));
+  heroMound.scale.set(1, 0.28, 1);
+  heroMound.position.y = SOIL_Y - 0.01;
+  heroMound.receiveShadow = true;
+  scene.add(heroMound);
+  const seedMesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshStandardMaterial({ color: lin('#c9a36a'), roughness: 0.6 }));
+  seedMesh.scale.set(1, 0.6, 1.5);
+  seedMesh.position.set(0, SOIL_Y + 0.08, 0);
+  seedMesh.castShadow = true;
+  scene.add(seedMesh);
+  const HERO_SCALE = 1.6;
+  function makeHero() {
+    if (hero) {
+      scene.remove(hero.root);
+      hero.root.traverse(o => { if (o.isMesh && o.geometry !== LEAF) o.geometry.dispose(); });
+    }
+    hero = buildFlower(heroSpec);
+    hero.root.position.y = SOIL_Y + 0.02;
+    hero.root.scale.setScalar(HERO_SCALE);
+    scene.add(hero.root);
+    hero.setGrowth(0);
+  }
+  makeHero();
+
+  // =====================================================================
+  // Life: butterflies, pollen, fireflies
+  // =====================================================================
+  function wingTexture(kind) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const x = c.getContext('2d');
+    const K = {
+      monarch: ['#f28c1c', '#c95f0a', '#161210'],
+      morpho: ['#4aa3ff', '#1d5fd6', '#0f1830'],
+      white: ['#f6f4ec', '#e2e0d6', '#2b2b2b'],
+      brimstone: ['#f5e063', '#e2c33a', '#8a7a1c'],
+    }[kind];
+    const g = x.createRadialGradient(0, 64, 4, 0, 64, 130);
+    g.addColorStop(0, K[1]); g.addColorStop(0.6, K[0]); g.addColorStop(1, K[0]);
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    x.strokeStyle = K[2]; x.globalAlpha = 0.55; x.lineWidth = 2.2;
+    for (let i = 0; i < 7; i++) {
+      x.beginPath(); x.moveTo(0, 64);
+      const a = -1.2 + i * 0.4;
+      x.quadraticCurveTo(50, 64 + Math.sin(a) * 40, 128, 64 + Math.sin(a) * 90);
+      x.stroke();
+    }
+    x.globalAlpha = 1;
+    x.fillStyle = K[2];
+    x.fillRect(104, 0, 24, 128);
+    if (kind !== 'brimstone') {
+      x.fillStyle = '#ffffff';
+      for (let i = 0; i < 9; i++) { x.beginPath(); x.arc(113 + (i % 2) * 6, 10 + i * 13, 2.3, 0, TAU); x.fill(); }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding;
+    t.repeat.set(1 / 0.5, 1 / 0.7);
+    t.offset.set(0, 0.5);
+    return t;
+  }
+  const wingShape = new THREE.Shape();
+  wingShape.moveTo(0, 0.02);
+  wingShape.bezierCurveTo(0.08, 0.3, 0.42, 0.36, 0.45, 0.14);
+  wingShape.bezierCurveTo(0.47, 0.02, 0.34, 0.0, 0.3, -0.02);
+  wingShape.bezierCurveTo(0.36, -0.12, 0.3, -0.3, 0.14, -0.28);
+  wingShape.bezierCurveTo(0.06, -0.26, 0.02, -0.12, 0, -0.04);
+  const wingGeo = new THREE.ShapeGeometry(wingShape, 12);
+  wingGeo.rotateX(Math.PI / 2);
+  const bodyGeo = new THREE.CylinderGeometry(0.022, 0.016, 0.28, 8);
+  bodyGeo.rotateX(Math.PI / 2);
+  const butterflies = [];
+  const KINDS = ['monarch', 'morpho', 'white', 'brimstone', 'monarch', 'white', 'morpho', 'brimstone', 'monarch'];
+  KINDS.forEach((kind, i) => {
+    const mat = new THREE.MeshStandardMaterial({ map: wingTexture(kind), side: THREE.DoubleSide, roughness: 0.7, transparent: false });
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: lin('#1a1512'), roughness: 0.8 }));
+    const L = new THREE.Mesh(wingGeo, mat), R = new THREE.Mesh(wingGeo, mat);
+    R.scale.x = -1;
+    L.castShadow = R.castShadow = true;
+    g.add(body, L, R);
+    g.scale.setScalar(0.42);
+    const r = rng(500 + i);
+    g.position.set((r() - 0.5) * 10, 1 + r() * 2, (r() - 0.5) * 10);
+    scene.add(g);
+    butterflies.push({ g, L, R, vel: new THREE.Vector3(), target: new THREE.Vector3(), land: 0, flap: r() * TAU, next: 0, r, active: i < 3 });
+  });
+
+  function glowTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  }
+  const glow = glowTexture();
+  function particles(count, spread, color, size, blink) {
+    const pos = new Float32Array(count * 3), ph = new Float32Array(count);
+    const r = rng(count + size * 100);
+    for (let i = 0; i < count; i++) {
+      pos.set([(r() - 0.5) * spread, 0.2 + r() * 3.2, (r() - 0.5) * spread], i * 3);
+      ph[i] = r() * TAU;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('phase', new THREE.BufferAttribute(ph, 1));
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uTime: windUniform, uMap: { value: glow }, uColor: { value: new THREE.Color(color) }, uOpacity: { value: 0 }, uSize: { value: size }, uBlink: { value: blink }, uPix: { value: renderer.getPixelRatio() } },
+      vertexShader: `
+        uniform float uTime, uSize, uBlink, uPix; attribute float phase; varying float vA;
+        void main(){
+          vec3 p = position;
+          p.x += sin(uTime * 0.3 + phase * 3.0) * 0.6;
+          p.y += sin(uTime * 0.5 + phase) * 0.35;
+          p.z += cos(uTime * 0.25 + phase * 2.0) * 0.6;
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mv;
+          gl_PointSize = uSize * uPix * (160.0 / -mv.z);
+          vA = mix(1.0, pow(max(sin(uTime * 1.7 + phase * 5.0), 0.0), 3.0), uBlink);
+        }`,
+      fragmentShader: `
+        uniform sampler2D uMap; uniform vec3 uColor; uniform float uOpacity; varying float vA;
+        void main(){ vec4 t = texture2D(uMap, gl_PointCoord); gl_FragColor = vec4(uColor, t.a * vA * uOpacity); }`,
+    });
+    const pts = new THREE.Points(g, mat);
+    pts.frustumCulled = false;
+    scene.add(pts);
+    return mat;
+  }
+  const pollen = particles(isSmall ? 140 : 220, 16, '#fff3c4', 0.28, 0.25);
+  const fireflies = particles(110, 18, '#d8ff7a', 0.75, 1.0);
+
+  // Bloom burst
+  const burstCount = 80;
+  const burstGeo = new THREE.BufferGeometry();
+  const burstPos = new Float32Array(burstCount * 3), burstVel = [];
+  burstGeo.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
+  const burstMat = new THREE.PointsMaterial({ size: 0.08, map: glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xffe9a0, opacity: 0 });
+  const burst = new THREE.Points(burstGeo, burstMat);
+  burst.frustumCulled = false;
+  scene.add(burst);
+  let burstT = -1;
+  function fireBurst(at) {
+    for (let i = 0; i < burstCount; i++) {
+      burstPos.set([at.x, at.y, at.z], i * 3);
+      const a = Math.random() * TAU, u = Math.random() * 2 - 1, sp = 0.8 + Math.random() * 1.6;
+      burstVel[i] = new THREE.Vector3(Math.cos(a) * Math.sqrt(1 - u * u), Math.abs(u) * 0.8 + 0.3, Math.sin(a) * Math.sqrt(1 - u * u)).multiplyScalar(sp);
+    }
+    burstGeo.attributes.position.needsUpdate = true;
+    burstT = 0;
+  }
+
+  // =====================================================================
+  // Light presets per phase
+  // =====================================================================
+  const PRESETS = {
+    focus: { top: '#4f8fd6', horizon: '#d7eaf3', bottom: '#a3c18c', sun: '#fff4df', sunI: 1.3, elev: 48, az: 35, hemiS: '#dcecff', hemiG: '#557a3a', hemiI: 0.72, exp: 1.0, pollen: 0.55, ff: 0, sunSize: 1 },
+    short: { top: '#5b77bd', horizon: '#ffcb8f', bottom: '#b8955f', sun: '#ffb870', sunI: 1.15, elev: 12, az: -60, hemiS: '#ffe0bb', hemiG: '#5d5a2e', hemiI: 0.6, exp: 1.05, pollen: 1.0, ff: 0, sunSize: 1.4 },
+    long:  { top: '#1b2352', horizon: '#dc8f86', bottom: '#3a3150', sun: '#ff9366', sunI: 0.5, elev: 3, az: -100, hemiS: '#9a92d8', hemiG: '#2b3322', hemiI: 0.5, exp: 1.12, pollen: 0.25, ff: 1, sunSize: 2 },
+  };
+  const cur = {};
+  function presetVals(name) {
+    const P = PRESETS[name];
+    return {
+      top: new THREE.Color(P.top), horizon: new THREE.Color(P.horizon), bottom: new THREE.Color(P.bottom),
+      sun: lin(P.sun), hemiS: lin(P.hemiS), hemiG: lin(P.hemiG), fog: lin(P.horizon), sunSky: new THREE.Color(P.sun),
+      sunI: P.sunI, elev: P.elev, az: P.az, hemiI: P.hemiI, exp: P.exp, pollen: P.pollen, ff: P.ff, sunSize: P.sunSize,
+    };
+  }
+  Object.assign(cur, presetVals('focus'));
+  function applyLighting(target, k) {
+    ['top', 'horizon', 'bottom', 'sun', 'hemiS', 'hemiG', 'fog', 'sunSky'].forEach(key => cur[key].lerp(target[key], k));
+    ['sunI', 'elev', 'az', 'hemiI', 'exp', 'pollen', 'ff', 'sunSize'].forEach(key => { cur[key] = lerp(cur[key], target[key], k); });
+    skyUniforms.top.value.copy(cur.top);
+    skyUniforms.horizon.value.copy(cur.horizon);
+    skyUniforms.bottom.value.copy(cur.bottom);
+    skyUniforms.sunColor.value.copy(cur.sunSky);
+    skyUniforms.sunSize.value = cur.sunSize;
+    const el = THREE.MathUtils.degToRad(cur.elev), az = THREE.MathUtils.degToRad(cur.az);
+    const dir = new THREE.Vector3(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az));
+    skyUniforms.sunDir.value.copy(dir);
+    sun.position.copy(dir).multiplyScalar(40);
+    sun.color.copy(cur.sun);
+    sun.intensity = cur.sunI;
+    hemi.color.copy(cur.hemiS); hemi.groundColor.copy(cur.hemiG); hemi.intensity = cur.hemiI;
+    scene.fog.color.copy(cur.fog);
+    renderer.toneMappingExposure = cur.exp;
+    pollen.uniforms.uOpacity.value = cur.pollen;
+    fireflies.uniforms.uOpacity.value = cur.ff;
+  }
+
+  // =====================================================================
+  // Camera: drag to orbit, pinch / wheel to zoom, slow drift when idle
+  // =====================================================================
+  const orbit = { theta: 0.6, phi: 1.2, radius: 9, target: new THREE.Vector3(0, 1.25, 0), lastInput: -1e9 };
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pointers = new Map();
+  let dragDist = 0, pinchStart = 0, radiusStart = 0;
+  canvas.addEventListener('pointerdown', e => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    dragDist = 0;
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchStart = Math.hypot(a.x - b.x, a.y - b.y); radiusStart = orbit.radius;
+    }
+  });
+  canvas.addEventListener('pointermove', e => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    orbit.lastInput = performance.now();
+    if (pointers.size === 1) {
+      dragDist += Math.abs(dx) + Math.abs(dy);
+      orbit.theta -= dx * 0.006;
+      orbit.phi = Math.max(0.55, Math.min(1.45, orbit.phi - dy * 0.005));
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      orbit.radius = Math.max(4.5, Math.min(18, radiusStart * pinchStart / d));
+      dragDist = 99;
+    }
+  });
+  const endPointer = e => {
+    if (pointers.size === 1 && dragDist < 6 && e.type === 'pointerup') pick(e.clientX, e.clientY);
+    pointers.delete(e.pointerId);
+  };
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    orbit.radius = Math.max(4.5, Math.min(18, orbit.radius * (1 + e.deltaY * 0.001)));
+    orbit.lastInput = performance.now();
+  }, { passive: false });
+
+  // Tap a planted flower to see when it was grown
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let tipTimer = 0;
+  function pick(x, y) {
+    ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(planted.map(p => p.mesh), false);
+    const tip = $('tip');
+    if (!hits.length) { tip.hidden = true; return; }
+    const e = hits[0].object.userData.entry;
+    const d = new Date(e.t);
+    const today = new Date().toDateString() === d.toDateString();
+    const when = (today ? 'Today' : d.toLocaleDateString([], { month: 'short', day: 'numeric' })) + ', ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    tip.innerHTML = '';
+    const b = document.createElement('b'); b.textContent = TYPES[e.type].name;
+    tip.append(b, document.createTextNode(`Grown ${when} · ${e.min} min of focus`));
+    tip.hidden = false;
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => { tip.hidden = true; }, 3500);
+  }
+
+  function layout() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    const panel = $('panel').getBoundingClientRect();
+    if (w >= 900) {
+      camera.setViewOffset(w + panel.width + 28, h, 0, 0, w, h);
+      camera.aspect = (w + panel.width + 28) / h;
+    } else {
+      const lift = Math.min(h * 0.42, h - panel.top + 16);
+      camera.setViewOffset(w, h + lift, 0, lift, w, h);
+      camera.aspect = w / (h + lift);
+    }
+    camera.fov = w / h < 0.75 ? 50 : 40;
+    camera.updateProjectionMatrix();
+    pollen.uniforms.uPix.value = fireflies.uniforms.uPix.value = renderer.getPixelRatio();
+  }
+  addEventListener('resize', layout);
+
+  // =====================================================================
+  // Timer
+  // =====================================================================
+  const PHASE_NAME = { focus: 'Focus', short: 'Short break', long: 'Long break' };
+  const saved = store.get('pg-state', null);
+  const S = Object.assign({ phase: 'focus', running: false, endAt: 0, remaining: settings.focus * 60000, round: 1 }, saved || {});
+  const dur = ph => settings[ph] * 60000;
+  const remaining = () => S.running ? Math.max(0, S.endAt - Date.now()) : S.remaining;
+  // Native alarm: rings as a notification if the phase ends while the app is in the background.
+  function syncAlarm() {
+    if (!native) return;
+    try {
+      if (!S.running) { native.cancelAlarm(); return; }
+      if (S.phase === 'focus') native.scheduleAlarm(S.endAt, 'Your flower is in bloom', 'Focus session done. Time for a break.');
+      else native.scheduleAlarm(S.endAt, 'Break is over', 'Ready to grow another flower?');
+    } catch (_) {}
+  }
+  const saveState = () => { store.set('pg-state', S); syncAlarm(); };
+  let heroAnim = null;   // {mode:'bloom'|'lapse', t0, dur}
+
+  function start() {
+    if (S.running) return;
+    unlockAudio();
+    if (native) { try { native.ensureNotifications(); } catch (_) {} }
+    if (S.remaining <= 0) S.remaining = dur(S.phase);
+    S.endAt = Date.now() + S.remaining;
+    S.running = true;
+    requestWake();
+    saveState(); renderUI();
+  }
+  function pause() {
+    if (!S.running) return;
+    S.remaining = Math.max(0, S.endAt - Date.now());
+    S.running = false;
+    releaseWake();
+    saveState(); renderUI();
+  }
+  function restartPhase() {
+    S.running = false;
+    S.remaining = dur(S.phase);
+    releaseWake();
+    saveState(); renderUI();
+  }
+  function setPhase(ph) {
+    S.phase = ph;
+    S.running = false;
+    S.remaining = dur(ph);
+    releaseWake();
+    saveState(); renderUI();
+  }
+  function nextPhaseOf(ph) {
+    if (ph === 'focus') return S.round >= settings.rounds ? 'long' : 'short';
+    return 'focus';
+  }
+  function completePhase(skipped) {
+    const done = S.phase;
+    if (done === 'focus' && !skipped) bloomHero();
+    const next = nextPhaseOf(done);
+    if (done !== 'focus') S.round = done === 'long' ? 1 : Math.min(settings.rounds, S.round + 1);
+    const auto = next === 'focus' ? settings.autoFocus : settings.autoBreak;
+    const prevEnd = S.endAt;
+    S.phase = next;
+    S.remaining = dur(next);
+    if (auto && S.running && !skipped) S.endAt = prevEnd + dur(next);
+    else if (skipped && S.running) S.endAt = Date.now() + dur(next);
+    else { S.running = false; releaseWake(); }
+    if (!skipped) {
+      chime(done);
+      vibrate(done === 'focus' ? [200, 100, 200] : [150]);
+      toast(done === 'focus' ? `${TYPES[heroSpec.type].name} in bloom. Time for a ${next === 'long' ? 'long' : 'short'} break.` : 'Break over. Ready to grow another?');
+    }
+    saveState(); renderUI();
+  }
+
+  function bloomHero() {
+    const entry = { ...heroSpec, t: Date.now(), min: settings.focus };
+    heroAnim = { mode: 'bloom', t0: performance.now(), dur: 2600, entry };
+    hero.head.getWorldPosition(hero.headWorld);
+    fireBurst(hero.headWorld);
+  }
+  function plantHero(entry) {
+    garden.push(entry);
+    store.set('pg-garden', garden);
+    const item = addPlanted(entry, garden.length - 1, true);
+    item.grow = 0;
+    heroSpec = newSpec();
+    store.set('pg-hero', heroSpec);
+    makeHero();
+    renderUI();
+  }
+
+  // ---- UI -------------------------------------------------------------
+  const fmt = ms => { const s = Math.ceil(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+  function stageFor(p) {
+    if (p < 0.02) return ['Seed', 'ready to sprout'];
+    if (p < 0.2) return ['Sprouting', 'roots settling in'];
+    if (p < 0.58) return ['Growing', 'leaves unfurling'];
+    if (p < 0.76) return ['Budding', 'a bud is forming'];
+    if (p < 0.999) return ['Blooming', `a ${TYPES[heroSpec.type].name.toLowerCase()} is opening`];
+    return ['In bloom', TYPES[heroSpec.type].name.toLowerCase()];
+  }
+  function renderUI() {
+    document.documentElement.dataset.phase = S.phase;
+    document.querySelectorAll('.tab').forEach(t => { t.classList.toggle('sel', t.dataset.phase === S.phase); t.setAttribute('aria-selected', t.dataset.phase === S.phase); });
+    const started = S.running || S.remaining < dur(S.phase);
+    $('mainBtn').textContent = S.running ? 'Pause' : started ? 'Resume' : S.phase === 'focus' ? 'Start focus' : 'Start break';
+    const rounds = $('rounds');
+    rounds.textContent = '';
+    for (let i = 1; i <= settings.rounds; i++) {
+      const d = document.createElement('span');
+      const doneCount = S.phase === 'focus' ? S.round - 1 : S.round;
+      if (i <= doneCount) d.className = 'done';
+      else if (i === S.round && S.phase === 'focus') d.className = 'now';
+      rounds.appendChild(d);
+    }
+    rounds.setAttribute('aria-label', `Session ${S.round} of ${settings.rounds}`);
+    const today = new Date().toDateString();
+    const todays = garden.filter(g => new Date(g.t).toDateString() === today);
+    const mins = todays.reduce((a, g) => a + g.min, 0);
+    $('stats').textContent = `Today: ${todays.length} ${todays.length === 1 ? 'flower' : 'flowers'} · ${mins} min` + (garden.length > todays.length ? ` · ${garden.length} in garden` : '');
+    tickUI();
+  }
+  let lastClock = '', lastStage = '';
+  function tickUI() {
+    const rem = remaining();
+    const d = dur(S.phase);
+    const p = clamp01(1 - rem / d);
+    const clock = fmt(rem);
+    if (clock !== lastClock) {
+      lastClock = clock;
+      $('clock').textContent = clock;
+      document.title = S.running ? `${clock} · ${PHASE_NAME[S.phase]}` : 'Pomodoro Garden';
+    }
+    $('barFill').style.width = (p * 100).toFixed(2) + '%';
+    let html;
+    if (S.phase === 'focus') {
+      const [a, b] = stageFor(heroAnim && heroAnim.mode === 'bloom' ? 1 : heroAnim && heroAnim.mode === 'lapse' ? heroProgress() : p);
+      html = `<b>${a}</b> · ${b}`;
+    } else {
+      html = `<b>${PHASE_NAME[S.phase]}</b> · ${S.phase === 'long' ? 'fireflies are out' : 'butterflies are visiting'}`;
+    }
+    if (html !== lastStage) { lastStage = html; $('stage').innerHTML = html; }
+    $('pct').textContent = Math.floor(p * 100) + '%';
+  }
+
+  $('mainBtn').addEventListener('click', () => S.running ? pause() : start());
+  $('resetBtn').addEventListener('click', restartPhase);
+  $('skipBtn').addEventListener('click', () => completePhase(true));
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setPhase(t.dataset.phase)));
+  document.addEventListener('keydown', e => {
+    if (!$('sheetWrap').hidden) { if (e.key === 'Escape') closeSheet(); return; }
+    if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); S.running ? pause() : start(); }
+  });
+
+  let toastTimer = 0;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+  }
+
+  // ---- Settings sheet -------------------------------------------------
+  function syncSheet() {
+    ['focus', 'short', 'long'].forEach(k => { $('out-' + k).textContent = settings[k] + ' min'; });
+    $('out-rounds').textContent = settings.rounds;
+    $('autoBreak').checked = settings.autoBreak;
+    $('autoFocus').checked = settings.autoFocus;
+    $('volume').value = settings.volume;
+    $('ambience').checked = settings.ambience;
+    $('ambBtn').setAttribute('aria-pressed', settings.ambience);
+  }
+  function saveSettings() { store.set('pg-settings', settings); syncSheet(); }
+  document.querySelectorAll('.stepper').forEach(st => {
+    const key = st.dataset.key, min = +st.dataset.min, max = +st.dataset.max;
+    const [down, , up] = st.children;
+    const change = d => {
+      settings[key] = Math.max(min, Math.min(max, settings[key] + d));
+      if (key === S.phase && !S.running) S.remaining = dur(S.phase);
+      if (key === 'rounds') S.round = Math.min(S.round, settings.rounds);
+      saveSettings(); saveState(); renderUI();
+    };
+    down.addEventListener('click', () => change(-1));
+    up.addEventListener('click', () => change(1));
+  });
+  $('autoBreak').addEventListener('change', e => { settings.autoBreak = e.target.checked; saveSettings(); });
+  $('autoFocus').addEventListener('change', e => { settings.autoFocus = e.target.checked; saveSettings(); });
+  $('volume').addEventListener('input', e => { settings.volume = +e.target.value; saveSettings(); });
+  $('volume').addEventListener('change', () => { unlockAudio(); chime('short'); });
+  $('ambience').addEventListener('change', e => setAmbience(e.target.checked));
+  $('ambBtn').addEventListener('click', () => setAmbience(!settings.ambience));
+  $('lapseBtn').addEventListener('click', () => {
+    closeSheet();
+    if (S.phase === 'focus' && remaining() < dur('focus')) { toast('Finish or restart this focus session to watch a time-lapse.'); return; }
+    heroAnim = { mode: 'lapse', t0: performance.now(), dur: 10000 };
+  });
+  $('clearBtn').addEventListener('click', () => {
+    $('confirmText').textContent = garden.length ? `Remove all ${garden.length} planted ${garden.length === 1 ? 'flower' : 'flowers'}? This can't be undone.` : 'The garden is already empty.';
+    $('yesBtn').hidden = !garden.length;
+    $('confirm').hidden = false;
+  });
+  $('noBtn').addEventListener('click', () => { $('confirm').hidden = true; });
+  $('yesBtn').addEventListener('click', () => {
+    garden = []; store.set('pg-garden', garden);
+    rebuildGarden(); renderUI();
+    $('confirm').hidden = true;
+    toast('Garden cleared');
+  });
+  function openSheet() { syncSheet(); $('confirm').hidden = true; $('sheetWrap').hidden = false; }
+  function closeSheet() { $('sheetWrap').hidden = true; }
+  // Android Back button: close the settings sheet or tooltip first.
+  window.gardenBack = () => {
+    if (!$('sheetWrap').hidden) { closeSheet(); return true; }
+    if (!$('tip').hidden) { $('tip').hidden = true; return true; }
+    return false;
+  };
+  $('setBtn').addEventListener('click', openSheet);
+  $('doneBtn').addEventListener('click', closeSheet);
+  $('sheetWrap').addEventListener('click', e => { if (e.target === $('sheetWrap')) closeSheet(); });
+
+  // =====================================================================
+  // Sound: chimes and optional garden ambience (Web Audio, no files)
+  // =====================================================================
+  let ac = null, master = null, amb = null;
+  function unlockAudio() {
+    try {
+      if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.connect(ac.destination); }
+      if (ac.state === 'suspended') ac.resume();
+    } catch (_) { ac = null; }
+    return !!ac;
+  }
+  function bell(t, f, len, vol) {
+    [1, 2.01, 3.98].forEach((m, i) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = f * m;
+      const v = vol * [1, 0.35, 0.12][i];
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(v, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len / (i + 1));
+      o.connect(g).connect(master); o.start(t); o.stop(t + len + 0.05);
+    });
+  }
+  function chime(kind) {
+    if (!unlockAudio() || settings.volume === 0) return;
+    master.gain.value = Math.pow(settings.volume / 100, 1.5) * 0.6;
+    const t = ac.currentTime + 0.03;
+    const notes = kind === 'focus' ? [784, 988, 1175, 1568] : [1175, 880];
+    notes.forEach((f, i) => bell(t + i * 0.16, f, 1.6, 0.5));
+  }
+  function setAmbience(on) {
+    settings.ambience = on; saveSettings();
+    if (!on) { if (amb) { amb.gain.gain.setTargetAtTime(0, ac.currentTime, 0.4); clearTimeout(amb.birdTimer); } return; }
+    if (!unlockAudio()) return;
+    if (!amb) {
+      const len = ac.sampleRate * 4, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.2; }
+      const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520;
+      const gain = ac.createGain(); gain.gain.value = 0;
+      const lfo = ac.createOscillator(), lfoG = ac.createGain();
+      lfo.frequency.value = 0.08; lfoG.gain.value = 220;
+      lfo.connect(lfoG).connect(lp.frequency);
+      src.connect(lp).connect(gain).connect(ac.destination);
+      src.start(); lfo.start();
+      amb = { gain };
+    }
+    amb.gain.gain.setTargetAtTime(0.16, ac.currentTime, 0.8);
+    const bird = () => {
+      if (!settings.ambience) return;
+      const t = ac.currentTime + 0.05, base = 2600 + Math.random() * 1400, n = 2 + ((Math.random() * 4) | 0);
+      for (let i = 0; i < n; i++) {
+        const o = ac.createOscillator(), g = ac.createGain(), s = t + i * (0.11 + Math.random() * 0.05);
+        o.type = 'sine';
+        o.frequency.setValueAtTime(base, s);
+        o.frequency.exponentialRampToValueAtTime(base * (1.25 + Math.random() * 0.4), s + 0.07);
+        g.gain.setValueAtTime(0.0001, s);
+        g.gain.exponentialRampToValueAtTime(0.035, s + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + 0.09);
+        o.connect(g).connect(ac.destination); o.start(s); o.stop(s + 0.12);
+      }
+      amb.birdTimer = setTimeout(bird, 2500 + Math.random() * 6500);
+    };
+    clearTimeout(amb.birdTimer);
+    amb.birdTimer = setTimeout(bird, 900);
+  }
+
+  // Keep the screen on while a session runs (optional; ignored if refused)
+  let wake = null;
+  async function requestWake() {
+    if (native) { native.keepScreenOn(true); return; }
+    try { if ('wakeLock' in navigator && !wake) wake = await navigator.wakeLock.request('screen'); } catch (_) {}
+  }
+  function releaseWake() {
+    if (native) native.keepScreenOn(false);
+    if (wake) { wake.release().catch(() => {}); wake = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    const visible = document.visibilityState === 'visible';
+    if (visible && S.running) requestWake();
+    // Go quiet in the background (the Android app shows a notification instead).
+    if (ac) { try { visible ? ac.resume() : ac.suspend(); } catch (_) {} }
+  });
+
+  // =====================================================================
+  // Main loop
+  // =====================================================================
+  const clock3 = new THREE.Clock();
+  const tmpV = new THREE.Vector3();
+  let lastPhaseKey = null, lightTarget = presetVals(S.phase);
+
+  function heroProgress() {
+    if (heroAnim) {
+      const k = (performance.now() - heroAnim.t0) / heroAnim.dur;
+      if (heroAnim.mode === 'lapse') {
+        if (k >= 1.35) { heroAnim = null; return 0; }
+        return clamp01(k);
+      }
+      if (k >= 1) { const e = heroAnim.entry; heroAnim = null; plantHero(e); return 0; }
+      return 1;
+    }
+    return S.phase === 'focus' ? clamp01(1 - remaining() / dur('focus')) : 0;
+  }
+
+  function updateButterflies(dt, t) {
+    const want = S.phase === 'short' ? 9 : S.phase === 'long' ? 4 : 4;
+    const spots = landingSpots;
+    spots.length = 0;
+    planted.forEach(p => { if (p.grow >= 1) spots.push(tmpV.copy(p.mesh.userData.headLocal).multiplyScalar(p.mesh.scale.x).applyEuler(p.mesh.rotation).add(p.mesh.position).clone()); });
+    swayers.forEach((s, i) => { if (i % 3 === 0) spots.push(s.obj.userData.headLocal.clone().multiplyScalar(s.obj.scale.x).applyEuler(s.obj.rotation).add(s.obj.position)); });
+    if (hero && heroProgress() > 0.97) { hero.head.getWorldPosition(tmpV); spots.push(tmpV.clone()); }
+
+    butterflies.forEach((b, i) => {
+      const active = i < want;
+      if (!active && !b.g.visible) return;
+      if (b.next <= t) {
+        if (spots.length && b.r() < 0.6) { b.target.copy(spots[(b.r() * spots.length) | 0]); b.target.y += 0.06; b.landing = true; }
+        else { b.target.set((b.r() - 0.5) * 14, 0.8 + b.r() * 2.6, (b.r() - 0.5) * 14); b.landing = false; }
+        b.next = t + 4 + b.r() * 5;
+        b.land = 0;
+      }
+      if (!active) { b.target.set(b.g.position.x * 1.5, 6, b.g.position.z * 1.5); }
+      b.g.visible = active || b.g.position.y < 5.5;
+      const toT = tmpV.copy(b.target).sub(b.g.position);
+      const dist = toT.length();
+      const landed = b.landing && dist < 0.08;
+      if (landed) {
+        b.vel.multiplyScalar(0.8);
+        b.g.position.lerp(b.target, 0.2);
+        b.flap += dt * 3;
+        if (!b.landedAt) { b.landedAt = t; b.next = t + 2.5 + b.r() * 3; }
+      } else {
+        b.landedAt = 0;
+        toT.normalize().multiplyScalar(Math.min(2.2, dist * 2.5));
+        toT.y += Math.sin(t * 5 + i) * 0.6;
+        b.vel.lerp(toT, 1 - Math.exp(-dt * 2.2));
+        b.g.position.addScaledVector(b.vel, dt);
+        b.flap += dt * 19;
+        if (b.vel.lengthSq() > 0.001) {
+          const look = tmpV.copy(b.g.position).add(b.vel);
+          b.g.lookAt(look.x, b.g.position.y + b.vel.y * 0.3, look.z);
+        }
+      }
+      const f = landed ? 0.5 + Math.sin(b.flap) * 0.35 : Math.sin(b.flap) * 1.05 + 0.15;
+      b.L.rotation.z = f; b.R.rotation.z = -f;
+    });
+  }
+
+  function frame() {
+    const dt = Math.min(0.05, clock3.getDelta());
+    const t = clock3.elapsedTime;
+    windUniform.value = t;
+
+    // Timer
+    let guard = 0;
+    while (S.running && Date.now() >= S.endAt && guard++ < 10) completePhase(false);
+    tickUI();
+
+    // Lighting follows the phase
+    if (lastPhaseKey !== S.phase) { lastPhaseKey = S.phase; lightTarget = presetVals(S.phase); }
+    applyLighting(lightTarget, 1 - Math.exp(-dt * 1.1));
+
+    // Hero growth
+    const p = heroProgress();
+    hero.setGrowth(p);
+    seedMesh.visible = p < 0.03;
+    hero.root.rotation.z = Math.sin(t * 1.3) * 0.025 * p;
+    hero.root.rotation.x = Math.sin(t * 0.9 + 1) * 0.02 * p;
+    if (heroAnim && heroAnim.mode === 'bloom') hero.root.scale.setScalar(HERO_SCALE * (1 + Math.sin(Math.min(1, (performance.now() - heroAnim.t0) / 600) * Math.PI) * 0.06));
+    else hero.root.scale.setScalar(HERO_SCALE);
+
+    // Planted flowers pop in and sway
+    planted.forEach(pl => {
+      if (pl.grow < 1) { pl.grow = Math.min(1, pl.grow + dt * 0.9); pl.mesh.scale.setScalar(0.85 * Math.max(0.0001, easeOutBack(pl.grow))); }
+      pl.mesh.rotation.z = Math.sin(t * 1.2 + pl.ph) * 0.035;
+      pl.mesh.rotation.x = Math.sin(t * 0.8 + pl.ph * 2) * 0.025;
+    });
+    swayers.forEach(s => {
+      s.obj.rotation.z = Math.sin(t * 1.4 + s.ph + s.obj.position.x * 0.2) * s.amp;
+      s.obj.rotation.x = Math.sin(t * 1.0 + s.ph) * s.amp * 0.6;
+    });
+
+    updateButterflies(dt, t);
+
+    // Burst particles
+    if (burstT >= 0) {
+      burstT += dt;
+      for (let i = 0; i < burstCount; i++) {
+        burstVel[i].y -= dt * 0.9;
+        burstPos[i * 3] += burstVel[i].x * dt;
+        burstPos[i * 3 + 1] += burstVel[i].y * dt;
+        burstPos[i * 3 + 2] += burstVel[i].z * dt;
+      }
+      burstGeo.attributes.position.needsUpdate = true;
+      burstMat.opacity = Math.max(0, 1 - burstT / 2.2);
+      if (burstT > 2.3) burstT = -1;
+    }
+
+    // Camera
+    const idle = performance.now() - orbit.lastInput > 5000;
+    if (idle && !reduceMotion) orbit.theta += dt * 0.035;
+    const sp = orbit.radius;
+    camera.position.set(
+      orbit.target.x + sp * Math.sin(orbit.phi) * Math.cos(orbit.theta),
+      orbit.target.y + sp * Math.cos(orbit.phi),
+      orbit.target.z + sp * Math.sin(orbit.phi) * Math.sin(orbit.theta));
+    camera.lookAt(orbit.target);
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  // Boot
+  if (innerWidth / innerHeight < 0.75) orbit.radius = 10.5;
+  layout();
+  renderUI();
+  syncSheet();
+  applyLighting(presetVals(S.phase), 1);
+  if (S.running) requestWake();
+  syncAlarm();
+  $('loading').remove();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

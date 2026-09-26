@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f8fd6"/><stop offset="0.62" stop-color="#d7eaf3"/>
+    </linearGradient>
+    <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f9a45"/><stop offset="1" stop-color="#3f6a28"/>
+    </linearGradient>
+    <radialGradient id="petal" cx="0.5" cy="0.9" r="0.9">
+      <stop offset="0" stop-color="#a8150c"/><stop offset="1" stop-color="#f2482a"/>
+    </radialGradient>
+    <clipPath id="c"><rect width="512" height="512" rx="112"/></clipPath>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <circle cx="398" cy="118" r="44" fill="#fff4df" opacity="0.95"/>
+    <path d="M0 350 Q140 300 270 336 T512 318 V512 H0 Z" fill="url(#hill)"/>
+    <ellipse cx="256" cy="430" rx="150" ry="34" fill="#4a3122"/>
+    <path d="M256 430 C246 360 268 300 254 222" fill="none" stroke="#3b6e28" stroke-width="12" stroke-linecap="round"/>
+    <path d="M254 352 C290 318 336 318 356 336 C328 358 288 364 254 352 Z" fill="#5f9e3c"/>
+    <path d="M258 300 C224 268 180 268 160 284 C190 306 228 310 258 300 Z" fill="#4f8a30"/>
+    <g transform="translate(254 196)">
+      <path d="M0 0 C-70 -10 -86 -86 -40 -108 C-22 -80 -8 -40 0 0 Z" fill="url(#petal)"/>
+      <path d="M0 0 C70 -10 86 -86 40 -108 C22 -80 8 -40 0 0 Z" fill="url(#petal)"/>
+      <path d="M0 0 C-58 -40 -44 -120 0 -126 C44 -120 58 -40 0 0 Z" fill="#ec3a1f"/>
+      <ellipse cx="0" cy="-8" rx="26" ry="10" fill="#1f1814"/>
+    </g>
+  </g>
+</svg>

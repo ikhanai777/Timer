@@ -86,6 +86,25 @@ fonts (Chakra Petch and Share Tech Mono, SIL Open Font License) are bundled in
 `android/prototimer.keystore` is the app's signing key. Keep it, because updates only
 install over the existing app when they're signed with the same key.
 
+## Pomodoro Garden (3D) Android app
+
+`garden.html` is a 3D Pomodoro timer. Each focus session grows a flower from seed to bloom,
+and the finished flower is planted in your garden. The sky shifts from morning (focus) to
+golden hour (short break) to dusk with fireflies (long break).
+
+`android/dist/PomodoroGarden.apk` is the Android app (about 390 KB). Three.js and the fonts
+are bundled, so it works offline. Install it the same way as Proto-Timer.
+- **Alarm with the phone locked:** when a focus session or break ends while the app is in
+  the background, Android shows a notification with sound and vibration. Allow
+  notifications the first time you start a session.
+- While a session runs, the screen stays on. **Back** closes settings or the flower tooltip.
+  Otherwise it moves the app to the background without stopping the timer.
+- Your garden is saved inside the app. It isn't shared with the browser version.
+
+To rebuild after editing `garden.html`, run `android/garden/build.sh`. It compiles the Java
+code against an Android 14 framework jar, which it downloads from Maven Central on the
+first build.
+
 ## Put it on your phone as a web app
 
 1. Host the folder on any HTTPS static host. For GitHub Pages: repo **Settings → Pages →
